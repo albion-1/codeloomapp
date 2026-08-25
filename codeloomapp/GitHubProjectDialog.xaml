@@ -1,0 +1,76 @@
+<Window x:Class="codeloomapp.GitHubProjectDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Create GitHub Project"
+        Width="470"
+        Height="360"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="#0B0D10">
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#F4F7FB" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="#F4F7FB" />
+            <Setter Property="Background" Value="#090B0E" />
+            <Setter Property="BorderBrush" Value="#303744" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="CaretBrush" Value="White" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="#F4F7FB" />
+            <Setter Property="Background" Value="#181D24" />
+            <Setter Property="BorderBrush" Value="#35404E" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#F4F7FB" />
+            <Setter Property="Margin" Value="0,0,18,0" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,18">
+            <TextBlock Text="Create Code Loom Project" FontSize="21" FontWeight="Bold" />
+            <TextBlock Text="Code Loom will create the local folder, Git repository, and GitHub repository for you."
+                       Foreground="#939EAE" TextWrapping="Wrap" Margin="0,5,0,0" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,0,0,12">
+            <TextBlock Text="PROJECT / REPOSITORY NAME" FontSize="10" Foreground="#939EAE" />
+            <TextBox x:Name="RepositoryNameBox" Text="WizardGame-CodeLoom" Margin="0,5,0,0" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Margin="0,0,0,12">
+            <TextBlock Text="DESCRIPTION" FontSize="10" Foreground="#939EAE" />
+            <TextBox x:Name="DescriptionBox" Text="Code Loom project" Margin="0,5,0,0" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Margin="0,0,0,12">
+            <TextBlock Text="VISIBILITY" FontSize="10" Foreground="#939EAE" Margin="0,0,0,7" />
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="PrivateRadio" Content="Private" IsChecked="True" />
+                <RadioButton x:Name="PublicRadio" Content="Public" />
+            </StackPanel>
+        </StackPanel>
+
+        <TextBlock Grid.Row="4" Text="You will choose where the local project folder is created after clicking Create."
+                   Foreground="#939EAE" TextWrapping="Wrap" VerticalAlignment="Top" />
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Cancel" Click="Cancel_Click" />
+            <Button Content="Create" Click="Create_Click" Background="#E7EDF7" Foreground="#090B0E" Margin="0" />
+        </StackPanel>
+    </Grid>
+</Window>
