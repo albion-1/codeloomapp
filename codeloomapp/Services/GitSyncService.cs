@@ -15,13 +15,9 @@ public sealed class GitSyncService
         if (!IsGitRepository(repositoryPath))
             return GitSyncResult.Fail("The selected folder is not a Git repository.");
 
-        var pull = await RunGitAsync(repositoryPath, "pull --rebase");
-        if (!pull.Success)
-            return GitSyncResult.Fail("Pull failed:\n" + pull.Output);
-
         var add = await RunGitAsync(repositoryPath, "add --all");
         if (!add.Success)
-            return GitSyncResult.Fail("Could not stage changes:\n" + add.Output);
+            return GitSyncResult.Fail("Could not stage local changes:\n" + add.Output);
 
         var status = await RunGitAsync(repositoryPath, "status --porcelain");
         if (!status.Success)
@@ -38,12 +34,16 @@ public sealed class GitSyncService
             committed = true;
         }
 
+        var pull = await RunGitAsync(repositoryPath, "pull --rebase");
+        if (!pull.Success)
+            return GitSyncResult.Fail("Pull/rebase failed. Code Loom did not push anything.\n" + pull.Output);
+
         var push = await RunGitAsync(repositoryPath, "push");
         if (!push.Success)
             return GitSyncResult.Fail("Push failed:\n" + push.Output);
 
         return GitSyncResult.Ok(committed
-            ? "Pulled remote changes, committed local changes, and pushed to GitHub."
+            ? "Saved, committed, pulled remote changes, and pushed to GitHub."
             : "Pulled remote changes and confirmed GitHub is up to date.");
     }
 
