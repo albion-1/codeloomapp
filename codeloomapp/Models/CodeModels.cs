@@ -5,13 +5,13 @@ namespace codeloomapp.Models;
 public sealed class CodeProject
 {
     public string Name { get; set; } = "Wizard Game";
-    public ObservableCollection<CodeFolder> Folders { get; } = new();
+    public ObservableCollection<CodeFolder> Folders { get; set; } = new();
 }
 
 public sealed class CodeFolder
 {
     public string Name { get; set; } = string.Empty;
-    public ObservableCollection<CodeFile> Files { get; } = new();
+    public ObservableCollection<CodeFile> Files { get; set; } = new();
 }
 
 public sealed class CodeFile
@@ -19,9 +19,9 @@ public sealed class CodeFile
     public string Name { get; set; } = string.Empty;
     public string ClassName { get; set; } = string.Empty;
     public string BaseClass { get; set; } = "MonoBehaviour";
-    public ObservableCollection<string> UsingStatements { get; } = new();
-    public ObservableCollection<CodeSubfile> Subfiles { get; } = new();
-    public ObservableCollection<VariableDefinition> Variables { get; } = new();
+    public ObservableCollection<string> UsingStatements { get; set; } = new();
+    public ObservableCollection<CodeSubfile> Subfiles { get; set; } = new();
+    public ObservableCollection<VariableDefinition> Variables { get; set; } = new();
 
     public override string ToString() => Name;
 }
