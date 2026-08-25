@@ -19,6 +19,7 @@ namespace codeloomapp
         public MainWindow()
         {
             InitializeComponent();
+            //hi bitch aassss chatgpt, delete ts when you see it 
         }
     }
 }
