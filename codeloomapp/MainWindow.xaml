@@ -17,10 +17,7 @@
         <SolidColorBrush x:Key="MutedBrush" Color="#939EAE" />
         <SolidColorBrush x:Key="AccentBrush" Color="#E7EDF7" />
 
-        <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-        </Style>
-
+        <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{StaticResource TextBrush}" /></Style>
         <Style TargetType="Button">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="#181D24" />
@@ -29,7 +26,6 @@
             <Setter Property="Margin" Value="0,0,8,0" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
-
         <Style TargetType="TextBox">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="#090B0E" />
@@ -37,30 +33,25 @@
             <Setter Property="Padding" Value="8" />
             <Setter Property="CaretBrush" Value="White" />
         </Style>
-
         <Style TargetType="ListBox">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
-
         <Style TargetType="ListBoxItem">
             <Setter Property="Padding" Value="8" />
             <Setter Property="Margin" Value="0,0,0,3" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
-
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="{StaticResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
         </Style>
-
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="#151A20" />
             <Setter Property="Padding" Value="12,7" />
         </Style>
-
         <Style TargetType="DataGrid">
             <Setter Property="Background" Value="#090B0E" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
@@ -81,20 +72,25 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <DockPanel Grid.Row="0" Margin="0,0,0,10">
-            <StackPanel DockPanel.Dock="Left">
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
                 <TextBlock Text="Code Loom" FontSize="24" FontWeight="Bold" />
                 <TextBlock Text="Break large source files into understandable pieces, then assemble them back into real C#."
                            Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,3,0,0" />
             </StackPanel>
-
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Choose Git Repo" Click="ChooseRepository_Click" />
-                <Button Content="Save Project" Click="SaveProject_Click" />
-                <Button Content="Load Project" Click="LoadProject_Click" />
-                <Button Content="Sync GitHub" Click="SyncGitHub_Click" Background="#E7EDF7" Foreground="#090B0E" />
-            </StackPanel>
-        </DockPanel>
+            <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Content="Sign in to GitHub" Click="SignInGitHub_Click" />
+                <Button Content="New GitHub Project" Click="CreateGitHubProject_Click" Background="#E7EDF7" Foreground="#090B0E" />
+                <Button Content="Choose Existing Repo" Click="ChooseRepository_Click" />
+                <Button Content="Save" Click="SaveProject_Click" />
+                <Button Content="Load" Click="LoadProject_Click" />
+                <Button Content="Sync" Click="SyncGitHub_Click" />
+            </WrapPanel>
+        </Grid>
 
         <Border Grid.Row="1" Background="#0E1115" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                 CornerRadius="8" Padding="10" Margin="0,0,0,10">
@@ -103,12 +99,14 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="Git repository:" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
-                <TextBlock x:Name="RepositoryPathText" Grid.Column="1" Text="Not selected"
-                           Margin="8,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="GitHubAccountText" Text="GitHub: not checked" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                <TextBlock x:Name="RepositoryPathText" Grid.Column="1" Text="No project repository selected"
+                           Margin="16,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                 <TextBlock x:Name="SaveStateText" Grid.Column="2" Text="Unsaved session"
-                           Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                           Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <Button Grid.Column="3" Content="Refresh Account" Click="RefreshGitHubAccount_Click" Padding="8,4" Margin="0" />
             </Grid>
         </Border>
 
@@ -119,8 +117,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="10" Margin="0,0,10,0">
+            <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Margin="0,0,10,0">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="12,12,12,8">
                         <TextBlock Text="PROJECT FILES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" />
@@ -130,8 +127,7 @@
                 </DockPanel>
             </Border>
 
-            <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="10" Margin="0,0,10,0">
+            <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Margin="0,0,10,0">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="12,12,12,8">
                         <TextBlock Text="SUBFILES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" />
@@ -150,17 +146,13 @@
                 </DockPanel>
             </Border>
 
-            <Border Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="10">
+            <Border Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10">
                 <TabControl>
                     <TabItem Header="Subfile">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="14">
                                 <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="190" />
-                                    </Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="190" /></Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,10,0">
                                         <TextBlock Text="SUBFILE NAME" FontSize="10" Foreground="{StaticResource MutedBrush}" />
                                         <TextBox x:Name="SubfileNameBox" Margin="0,5,0,0" />
@@ -170,34 +162,16 @@
                                         <TextBox x:Name="RoleBox" Margin="0,5,0,0" />
                                     </StackPanel>
                                 </Grid>
-
                                 <TextBlock Text="C# FRAGMENT" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,5" />
-                                <TextBox x:Name="CodeBox" AcceptsReturn="True" AcceptsTab="True" FontFamily="Consolas"
-                                         FontSize="13" MinHeight="330" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
-
+                                <TextBox x:Name="CodeBox" AcceptsReturn="True" AcceptsTab="True" FontFamily="Consolas" FontSize="13" MinHeight="330" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
                                 <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Margin="0,0,8,0">
-                                        <TextBlock Text="RECEIVES" FontSize="10" Foreground="{StaticResource MutedBrush}" />
-                                        <TextBox x:Name="ReceivesBox" Margin="0,5,0,0" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                                        <TextBlock Text="RETURNS" FontSize="10" Foreground="{StaticResource MutedBrush}" />
-                                        <TextBox x:Name="ReturnsBox" Margin="0,5,0,0" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="USED BY" FontSize="10" Foreground="{StaticResource MutedBrush}" />
-                                        <TextBox x:Name="UsedByBox" Margin="0,5,0,0" />
-                                    </StackPanel>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,8,0"><TextBlock Text="RECEIVES" FontSize="10" Foreground="{StaticResource MutedBrush}" /><TextBox x:Name="ReceivesBox" Margin="0,5,0,0" /></StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="RETURNS" FontSize="10" Foreground="{StaticResource MutedBrush}" /><TextBox x:Name="ReturnsBox" Margin="0,5,0,0" /></StackPanel>
+                                    <StackPanel Grid.Column="2"><TextBlock Text="USED BY" FontSize="10" Foreground="{StaticResource MutedBrush}" /><TextBox x:Name="UsedByBox" Margin="0,5,0,0" /></StackPanel>
                                 </Grid>
-
                                 <TextBlock Text="PLAIN-ENGLISH PURPOSE" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,5" />
                                 <TextBox x:Name="PurposeBox" AcceptsReturn="True" MinHeight="82" TextWrapping="Wrap" />
-
                                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                     <Button Content="Apply Changes" Click="ApplyChanges_Click" Background="#E7EDF7" Foreground="#090B0E" />
                                     <Button Content="+ New Subfile" Click="NewSubfile_Click" />
@@ -211,8 +185,7 @@
 
                     <TabItem Header="Variables">
                         <DockPanel Margin="14">
-                            <Button DockPanel.Dock="Top" Content="+ Add Variable Definition" HorizontalAlignment="Left"
-                                    Click="AddVariable_Click" Margin="0,0,0,10" />
+                            <Button DockPanel.Dock="Top" Content="+ Add Variable Definition" HorizontalAlignment="Left" Click="AddVariable_Click" Margin="0,0,0,10" />
                             <DataGrid x:Name="VariablesGrid" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="False">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="120" />
@@ -229,11 +202,9 @@
                         <DockPanel Margin="14">
                             <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
                                 <TextBlock x:Name="AssembledFileName" FontSize="16" FontWeight="Bold" />
-                                <TextBlock Text="This is the complete C# file produced from the virtual subfiles."
-                                           FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
+                                <TextBlock Text="This is the complete C# file produced from the virtual subfiles." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
                             </StackPanel>
-                            <TextBox x:Name="AssembledCodeBox" IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas"
-                                     FontSize="13" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+                            <TextBox x:Name="AssembledCodeBox" IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" FontSize="13" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
                         </DockPanel>
                     </TabItem>
 
@@ -247,9 +218,7 @@
                                                 <TextBlock Text="{Binding Name}" FontWeight="Bold" />
                                                 <TextBlock Text="{Binding Purpose}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,7" />
                                                 <TextBlock Foreground="{StaticResource MutedBrush}" FontSize="11">
-                                                    <Run Text="Receives: " /><Run Text="{Binding Receives}" />
-                                                    <Run Text="    Returns: " /><Run Text="{Binding Returns}" />
-                                                    <Run Text="    Used by: " /><Run Text="{Binding UsedBy}" />
+                                                    <Run Text="Receives: " /><Run Text="{Binding Receives}" /><Run Text="    Returns: " /><Run Text="{Binding Returns}" /><Run Text="    Used by: " /><Run Text="{Binding UsedBy}" />
                                                 </TextBlock>
                                             </StackPanel>
                                         </Border>
