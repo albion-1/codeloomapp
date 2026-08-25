@@ -8,7 +8,8 @@
         MinHeight="680"
         WindowStartupLocation="CenterScreen"
         Background="#0B0D10"
-        FontFamily="Segoe UI Variable Text">
+        FontFamily="Segoe UI Variable Text"
+        FontWeight="Light">
 
     <Window.Resources>
         <SolidColorBrush x:Key="PanelBrush" Color="#121519" />
@@ -30,10 +31,10 @@
             <Setter Property="Background" Value="#161A1F" />
             <Setter Property="BorderBrush" Value="{StaticResource ControlBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="11,7" />
-            <Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="Padding" Value="9,5" />
+            <Setter Property="Margin" Value="0,0,6,0" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="11" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -163,7 +164,7 @@
                 <TextBlock x:Name="GitHubAccountText" Text="GitHub: not checked" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
                 <TextBlock x:Name="RepositoryPathText" Grid.Column="1" Text="No project repository selected" Margin="16,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                 <TextBlock x:Name="SaveStateText" Grid.Column="2" Text="Unsaved session" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0" />
-                <Button Grid.Column="3" Content="Refresh Account" Click="RefreshGitHubAccount_Click" Padding="8,4" Margin="0" />
+                <Button Grid.Column="3" Content="Refresh Account" Click="RefreshGitHubAccount_Click" Padding="7,3" Margin="0" />
             </Grid>
         </Border>
 
@@ -184,14 +185,14 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="ProjectNameText" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                            <Button Grid.Column="1" Content="Rename" Click="RenameProject_Click" Padding="7,4" Margin="6,0,0,0" />
+                            <Button Grid.Column="1" Content="Rename" Click="RenameProject_Click" Padding="6,3" Margin="6,0,0,0" />
                         </Grid>
 
                         <WrapPanel>
-                            <Button Content="+ Folder" Click="CreateFolder_Click" Padding="8,5" Margin="0,0,5,5" />
-                            <Button Content="+ File" Click="CreateFile_Click" Padding="8,5" Margin="0,0,5,5" />
-                            <Button Content="Rename" Click="RenameProjectItem_Click" Padding="8,5" Margin="0,0,5,5" />
-                            <Button Content="Delete" Click="DeleteProjectItem_Click" Padding="8,5" Margin="0,0,0,5" Foreground="#E7A3A3" />
+                            <Button Content="+ Folder" Click="CreateFolder_Click" Padding="7,4" Margin="0,0,5,5" />
+                            <Button Content="+ File" Click="CreateFile_Click" Padding="7,4" Margin="0,0,5,5" />
+                            <Button Content="Rename" Click="RenameProjectItem_Click" Padding="7,4" Margin="0,0,5,5" />
+                            <Button Content="Delete" Click="DeleteProjectItem_Click" Padding="7,4" Margin="0,0,0,5" Foreground="#E7A3A3" />
                         </WrapPanel>
                         <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,5,0,0" />
                     </StackPanel>
