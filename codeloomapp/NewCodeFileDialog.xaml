@@ -1,0 +1,85 @@
+<Window x:Class="codeloomapp.NewCodeFileDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="New C# File"
+        Width="470"
+        Height="360"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="#0B0D10"
+        FontFamily="Segoe UI Variable Text">
+    <Window.Resources>
+        <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#E8ECF1" /></Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="#E8ECF1" />
+            <Setter Property="Background" Value="#0D1013" />
+            <Setter Property="BorderBrush" Value="#2A3139" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="CaretBrush" Value="#E8ECF1" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Foreground" Value="#E8ECF1" />
+            <Setter Property="Background" Value="#161A1F" />
+            <Setter Property="BorderBrush" Value="#2A3139" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="#E8ECF1" />
+            <Setter Property="Background" Value="#161A1F" />
+            <Setter Property="BorderBrush" Value="#2A3139" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="13,7" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="MinWidth" Value="82" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Create C# file" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Grid.Row="1" Text="Creates a real Code Loom file inside the selected project folder." Foreground="#8A949F" Margin="0,4,0,15" />
+
+        <StackPanel Grid.Row="2" Margin="0,0,0,12">
+            <TextBlock Text="FOLDER" FontSize="10" Foreground="#8A949F" />
+            <ComboBox x:Name="FolderBox" Margin="0,5,0,0" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Margin="0,0,0,12">
+            <TextBlock Text="FILE NAME" FontSize="10" Foreground="#8A949F" />
+            <TextBox x:Name="FileNameBox" Margin="0,5,0,0" Text="NewScript.cs" TextChanged="FileNameBox_TextChanged" />
+        </StackPanel>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="160" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Margin="0,0,10,0">
+                <TextBlock Text="CLASS NAME" FontSize="10" Foreground="#8A949F" />
+                <TextBox x:Name="ClassNameBox" Margin="0,5,0,0" Text="NewScript" />
+            </StackPanel>
+            <StackPanel Grid.Column="1">
+                <TextBlock Text="BASE CLASS" FontSize="10" Foreground="#8A949F" />
+                <TextBox x:Name="BaseClassBox" Margin="0,5,0,0" Text="MonoBehaviour" />
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Grid.Row="5" Text="Code Loom will create one starter subfile so the new file is immediately editable." Foreground="#8A949F" FontSize="11" TextWrapping="Wrap" Margin="0,14,0,0" />
+
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+            <Button Content="Cancel" IsCancel="True" />
+            <Button Content="Create" IsDefault="True" Click="Create_Click" Background="#DCE3EA" Foreground="#0B0D10" BorderBrush="#DCE3EA" />
+        </StackPanel>
+    </Grid>
+</Window>
