@@ -185,15 +185,22 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="ProjectNameText" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                            <Button Grid.Column="1" Content="Rename" Click="RenameProject_Click" Padding="6,3" Margin="6,0,0,0" />
+                            <Button Grid.Column="1" Content="Rename Project" Click="RenameProject_Click" Padding="6,3" Margin="6,0,0,0" />
                         </Grid>
 
                         <WrapPanel>
                             <Button Content="+ Folder" Click="CreateFolder_Click" Padding="7,4" Margin="0,0,5,5" />
-                            <Button Content="+ File" Click="CreateFile_Click" Padding="7,4" Margin="0,0,5,5" />
-                            <Button Content="Rename" Click="RenameProjectItem_Click" Padding="7,4" Margin="0,0,5,5" />
-                            <Button Content="Delete" Click="DeleteProjectItem_Click" Padding="7,4" Margin="0,0,0,5" Foreground="#E7A3A3" />
+                            <Button Content="+ File" Click="CreateFile_Click" Padding="7,4" Margin="0,0,0,5" />
                         </WrapPanel>
+
+                        <WrapPanel x:Name="FileActionsPanel"
+                                   Visibility="Collapsed"
+                                   Loaded="FileActionsPanel_Loaded"
+                                   Margin="0,0,0,1">
+                            <Button Content="Rename File" Click="RenameProjectItem_Click" Padding="7,4" Margin="0,0,5,5" />
+                            <Button Content="Delete File" Click="DeleteProjectItem_Click" Padding="7,4" Margin="0,0,0,5" Foreground="#E7A3A3" />
+                        </WrapPanel>
+
                         <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,5,0,0" />
                     </StackPanel>
 
