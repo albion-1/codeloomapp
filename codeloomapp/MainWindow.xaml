@@ -7,59 +7,107 @@
         MinWidth="1050"
         MinHeight="680"
         WindowStartupLocation="CenterScreen"
-        Background="#090B0E">
+        Background="#0B0D10"
+        FontFamily="Segoe UI Variable Text">
 
     <Window.Resources>
-        <SolidColorBrush x:Key="PanelBrush" Color="#11151A" />
-        <SolidColorBrush x:Key="PanelAltBrush" Color="#0D1014" />
-        <SolidColorBrush x:Key="BorderBrush" Color="#29313B" />
-        <SolidColorBrush x:Key="TextBrush" Color="#F4F7FB" />
-        <SolidColorBrush x:Key="MutedBrush" Color="#939EAE" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#E7EDF7" />
+        <SolidColorBrush x:Key="PanelBrush" Color="#121519" />
+        <SolidColorBrush x:Key="PanelAltBrush" Color="#0F1215" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#20262D" />
+        <SolidColorBrush x:Key="ControlBorderBrush" Color="#2A3139" />
+        <SolidColorBrush x:Key="TextBrush" Color="#E8ECF1" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#8A949F" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#DCE3EA" />
+        <SolidColorBrush x:Key="HoverBrush" Color="#1B2026" />
+        <SolidColorBrush x:Key="PressedBrush" Color="#242B33" />
 
-        <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{StaticResource TextBrush}" /></Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+
         <Style TargetType="Button">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="Background" Value="#181D24" />
-            <Setter Property="BorderBrush" Value="#35404E" />
-            <Setter Property="Padding" Value="12,8" />
-            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Background" Value="#161A1F" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="11,7" />
+            <Setter Property="Margin" Value="0,0,7,0" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource HoverBrush}" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#343D47" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource PressedBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
+
         <Style TargetType="TextBox">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="Background" Value="#090B0E" />
-            <Setter Property="BorderBrush" Value="#303744" />
-            <Setter Property="Padding" Value="8" />
-            <Setter Property="CaretBrush" Value="White" />
+            <Setter Property="Background" Value="#0D1013" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="CaretBrush" Value="#E8ECF1" />
+            <Setter Property="SelectionBrush" Value="#495563" />
         </Style>
+
         <Style TargetType="ListBox">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
+
         <Style TargetType="ListBoxItem">
-            <Setter Property="Padding" Value="8" />
-            <Setter Property="Margin" Value="0,0,0,3" />
+            <Setter Property="Padding" Value="8,7" />
+            <Setter Property="Margin" Value="0,0,0,2" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
+
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="{StaticResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
         </Style>
+
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="Background" Value="#151A20" />
-            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="Background" Value="#14181D" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="Padding" Value="13,7" />
+            <Setter Property="FontSize" Value="12" />
         </Style>
+
         <Style TargetType="DataGrid">
-            <Setter Property="Background" Value="#090B0E" />
+            <Setter Property="Background" Value="#0D1013" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="GridLinesVisibility" Value="Horizontal" />
-            <Setter Property="HorizontalGridLinesBrush" Value="#252C35" />
-            <Setter Property="RowBackground" Value="#0D1014" />
-            <Setter Property="AlternatingRowBackground" Value="#11151A" />
+            <Setter Property="HorizontalGridLinesBrush" Value="#1E242B" />
+            <Setter Property="RowBackground" Value="#0F1215" />
+            <Setter Property="AlternatingRowBackground" Value="#121519" />
             <Setter Property="HeadersVisibility" Value="Column" />
         </Style>
     </Window.Resources>
@@ -77,14 +125,16 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+
             <StackPanel>
-                <TextBlock Text="Code Loom" FontSize="24" FontWeight="Bold" />
+                <TextBlock Text="Code Loom" FontSize="24" FontWeight="SemiBold" />
                 <TextBlock Text="Break large source files into understandable pieces, then assemble them back into real C#."
                            Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,3,0,0" />
             </StackPanel>
+
             <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button Content="Sign in to GitHub" Click="SignInGitHub_Click" />
-                <Button Content="New GitHub Project" Click="CreateGitHubProject_Click" Background="#E7EDF7" Foreground="#090B0E" />
+                <Button Content="New GitHub Project" Click="CreateGitHubProject_Click" Background="#DCE3EA" Foreground="#0B0D10" BorderBrush="#DCE3EA" />
                 <Button Content="Choose Existing Repo" Click="ChooseRepository_Click" />
                 <Button Content="Save" Click="SaveProject_Click" />
                 <Button Content="Load" Click="LoadProject_Click" />
@@ -92,8 +142,12 @@
             </WrapPanel>
         </Grid>
 
-        <Border Grid.Row="1" Background="#0E1115" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                CornerRadius="8" Padding="10" Margin="0,0,0,10">
+        <Border Grid.Row="1"
+                Background="{StaticResource PanelAltBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                Padding="10"
+                Margin="0,0,0,10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -117,20 +171,20 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Margin="0,0,10,0">
+            <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0,0,10,0">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="12,12,12,8">
-                        <TextBlock Text="PROJECT FILES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" />
+                        <TextBlock Text="PROJECT FILES" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" />
                         <TextBlock Text="Unity-facing scripts" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
                     </StackPanel>
                     <ListBox x:Name="FileList" Margin="8" SelectionChanged="FileList_SelectionChanged" />
                 </DockPanel>
             </Border>
 
-            <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Margin="0,0,10,0">
+            <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0,0,10,0">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="12,12,12,8">
-                        <TextBlock Text="SUBFILES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource MutedBrush}" />
+                        <TextBlock Text="SUBFILES" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" />
                         <TextBlock x:Name="ActiveFileText" Text="No file selected" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
                     </StackPanel>
                     <ListBox x:Name="SubfileList" Margin="8" SelectionChanged="SubfileList_SelectionChanged">
@@ -146,13 +200,16 @@
                 </DockPanel>
             </Border>
 
-            <Border Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10">
+            <Border Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                 <TabControl>
                     <TabItem Header="Subfile">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="14">
                                 <Grid>
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="190" /></Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="190" />
+                                    </Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,10,0">
                                         <TextBlock Text="SUBFILE NAME" FontSize="10" Foreground="{StaticResource MutedBrush}" />
                                         <TextBox x:Name="SubfileNameBox" Margin="0,5,0,0" />
@@ -162,22 +219,39 @@
                                         <TextBox x:Name="RoleBox" Margin="0,5,0,0" />
                                     </StackPanel>
                                 </Grid>
+
                                 <TextBlock Text="C# FRAGMENT" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,5" />
-                                <TextBox x:Name="CodeBox" AcceptsReturn="True" AcceptsTab="True" FontFamily="Consolas" FontSize="13" MinHeight="330" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+                                <TextBox x:Name="CodeBox" AcceptsReturn="True" AcceptsTab="True" FontFamily="Cascadia Mono, Consolas" FontSize="13" MinHeight="330" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+
                                 <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                    <StackPanel Margin="0,0,8,0"><TextBlock Text="RECEIVES" FontSize="10" Foreground="{StaticResource MutedBrush}" /><TextBox x:Name="ReceivesBox" Margin="0,5,0,0" /></StackPanel>
-                                    <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="RETURNS" FontSize="10" Foreground="{StaticResource MutedBrush}" /><TextBox x:Name="ReturnsBox" Margin="0,5,0,0" /></StackPanel>
-                                    <StackPanel Grid.Column="2"><TextBlock Text="USED BY" FontSize="10" Foreground="{StaticResource MutedBrush}" /><TextBox x:Name="UsedByBox" Margin="0,5,0,0" /></StackPanel>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="RECEIVES" FontSize="10" Foreground="{StaticResource MutedBrush}" />
+                                        <TextBox x:Name="ReceivesBox" Margin="0,5,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                        <TextBlock Text="RETURNS" FontSize="10" Foreground="{StaticResource MutedBrush}" />
+                                        <TextBox x:Name="ReturnsBox" Margin="0,5,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="USED BY" FontSize="10" Foreground="{StaticResource MutedBrush}" />
+                                        <TextBox x:Name="UsedByBox" Margin="0,5,0,0" />
+                                    </StackPanel>
                                 </Grid>
+
                                 <TextBlock Text="PLAIN-ENGLISH PURPOSE" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,5" />
                                 <TextBox x:Name="PurposeBox" AcceptsReturn="True" MinHeight="82" TextWrapping="Wrap" />
+
                                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                    <Button Content="Apply Changes" Click="ApplyChanges_Click" Background="#E7EDF7" Foreground="#090B0E" />
+                                    <Button Content="Apply Changes" Click="ApplyChanges_Click" Background="#DCE3EA" Foreground="#0B0D10" BorderBrush="#DCE3EA" />
                                     <Button Content="+ New Subfile" Click="NewSubfile_Click" />
                                     <Button Content="Move Up" Click="MoveUp_Click" />
                                     <Button Content="Move Down" Click="MoveDown_Click" />
-                                    <Button Content="Delete" Click="DeleteSubfile_Click" Foreground="#FFB1B1" />
+                                    <Button Content="Delete" Click="DeleteSubfile_Click" Foreground="#E7A3A3" />
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
@@ -201,10 +275,10 @@
                     <TabItem Header="Assembled .cs">
                         <DockPanel Margin="14">
                             <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-                                <TextBlock x:Name="AssembledFileName" FontSize="16" FontWeight="Bold" />
+                                <TextBlock x:Name="AssembledFileName" FontSize="16" FontWeight="SemiBold" />
                                 <TextBlock Text="This is the complete C# file produced from the virtual subfiles." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
                             </StackPanel>
-                            <TextBox x:Name="AssembledCodeBox" IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" FontSize="13" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+                            <TextBox x:Name="AssembledCodeBox" IsReadOnly="True" AcceptsReturn="True" FontFamily="Cascadia Mono, Consolas" FontSize="13" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
                         </DockPanel>
                     </TabItem>
 
@@ -213,12 +287,14 @@
                             <ItemsControl x:Name="FlowItems" Margin="14">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="#0D1014" BorderBrush="#29313B" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="12" Margin="0,0,0,8">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" />
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
                                                 <TextBlock Text="{Binding Purpose}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,7" />
                                                 <TextBlock Foreground="{StaticResource MutedBrush}" FontSize="11">
-                                                    <Run Text="Receives: " /><Run Text="{Binding Receives}" /><Run Text="    Returns: " /><Run Text="{Binding Returns}" /><Run Text="    Used by: " /><Run Text="{Binding UsedBy}" />
+                                                    <Run Text="Receives: " /><Run Text="{Binding Receives}" />
+                                                    <Run Text="    Returns: " /><Run Text="{Binding Returns}" />
+                                                    <Run Text="    Used by: " /><Run Text="{Binding UsedBy}" />
                                                 </TextBlock>
                                             </StackPanel>
                                         </Border>
