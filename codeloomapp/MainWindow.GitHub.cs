@@ -79,6 +79,7 @@ public partial class MainWindow
             SaveEditorToActiveSubfile();
             CommitVariableEdits();
             _project.Name = projectDialog.RepositoryName;
+            RefreshProjectTree();
             _storage.SaveProject(_project, localFolder);
 
             StatusText.Text = "Creating GitHub repository...";
