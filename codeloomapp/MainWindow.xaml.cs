@@ -1,6 +1,9 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
 using codeloomapp.Models;
 using codeloomapp.Services;
 
@@ -8,7 +11,11 @@ namespace codeloomapp;
 
 public partial class MainWindow : Window
 {
-    private readonly CodeProject _project = new();
+    private readonly ProjectStorageService _storage = new();
+    private readonly GitSyncService _git = new();
+
+    private CodeProject _project = new();
+    private AppSettings _settings = new();
     private CodeFile? _activeFile;
     private CodeSubfile? _activeSubfile;
     private bool _isLoadingEditor;
@@ -16,16 +23,102 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        BuildDemoProject();
+        _settings = _storage.LoadSettings();
+
+        if (!TryLoadRememberedProject())
+            BuildDemoProject();
+
+        RefreshRepositoryDisplay();
         RefreshFileList();
 
         if (FileList.Items.Count > 0)
             FileList.SelectedIndex = 0;
     }
 
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        SaveEditorToActiveSubfile();
+        CommitVariableEdits();
+
+        if (HasRepository())
+        {
+            try
+            {
+                _storage.SaveProject(_project, _settings.GitRepositoryPath);
+            }
+            catch
+            {
+                // Closing should never be blocked by an autosave failure.
+            }
+        }
+
+        base.OnClosing(e);
+    }
+
+    private bool TryLoadRememberedProject()
+    {
+        if (!HasRepository())
+            return false;
+
+        try
+        {
+            var loaded = _storage.LoadProject(_settings.GitRepositoryPath);
+            if (loaded is null)
+                return false;
+
+            _project = loaded;
+            SaveStateText.Text = "Loaded from disk";
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool HasRepository()
+    {
+        return !string.IsNullOrWhiteSpace(_settings.GitRepositoryPath)
+               && Directory.Exists(_settings.GitRepositoryPath)
+               && _git.IsGitRepository(_settings.GitRepositoryPath);
+    }
+
+    private void RefreshRepositoryDisplay()
+    {
+        RepositoryPathText.Text = HasRepository()
+            ? _settings.GitRepositoryPath
+            : "Not selected";
+    }
+
+    private bool SelectRepository()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Choose the local Git repository Code Loom should use"
+        };
+
+        if (dialog.ShowDialog() != true)
+            return false;
+
+        if (!_git.IsGitRepository(dialog.FolderName))
+        {
+            MessageBox.Show(
+                "That folder is not a Git repository. Choose the folder that contains the .git directory.",
+                "Code Loom",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
+        }
+
+        _settings.GitRepositoryPath = dialog.FolderName;
+        _storage.SaveSettings(_settings);
+        RefreshRepositoryDisplay();
+        return true;
+    }
+
     private void BuildDemoProject()
     {
-        _project.Folders.Clear();
+        _project = new CodeProject { Name = "Wizard Game" };
 
         var playerFolder = new CodeFolder { Name = "Player" };
         var combatFolder = new CodeFolder { Name = "Combat" };
@@ -226,15 +319,30 @@ public partial class MainWindow : Window
     {
         var files = new ObservableCollection<CodeFile>();
         foreach (var folder in _project.Folders)
+        {
             foreach (var file in folder.Files)
                 files.Add(file);
+        }
 
         FileList.ItemsSource = files;
+    }
+
+    private void RefreshEntireProjectUi()
+    {
+        _activeFile = null;
+        _activeSubfile = null;
+        RefreshFileList();
+
+        if (FileList.Items.Count > 0)
+            FileList.SelectedIndex = 0;
+        else
+            ClearEditor();
     }
 
     private void FileList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         SaveEditorToActiveSubfile();
+        CommitVariableEdits();
 
         _activeFile = FileList.SelectedItem as CodeFile;
         if (_activeFile is null)
@@ -268,13 +376,7 @@ public partial class MainWindow : Window
 
         if (_activeSubfile is null)
         {
-            SubfileNameBox.Text = string.Empty;
-            RoleBox.Text = string.Empty;
-            CodeBox.Text = string.Empty;
-            ReceivesBox.Text = string.Empty;
-            ReturnsBox.Text = string.Empty;
-            UsedByBox.Text = string.Empty;
-            PurposeBox.Text = string.Empty;
+            ClearEditor();
         }
         else
         {
@@ -288,6 +390,17 @@ public partial class MainWindow : Window
         }
 
         _isLoadingEditor = false;
+    }
+
+    private void ClearEditor()
+    {
+        SubfileNameBox.Text = string.Empty;
+        RoleBox.Text = string.Empty;
+        CodeBox.Text = string.Empty;
+        ReceivesBox.Text = string.Empty;
+        ReturnsBox.Text = string.Empty;
+        UsedByBox.Text = string.Empty;
+        PurposeBox.Text = string.Empty;
     }
 
     private void SaveEditorToActiveSubfile()
@@ -308,6 +421,13 @@ public partial class MainWindow : Window
         SubfileList.Items.Refresh();
         FlowItems.Items.Refresh();
         RefreshAssembledCode();
+        SaveStateText.Text = "Changes not saved to disk";
+    }
+
+    private void CommitVariableEdits()
+    {
+        VariablesGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+        VariablesGrid.CommitEdit(DataGridEditingUnit.Row, true);
     }
 
     private void RefreshAssembledCode()
@@ -315,6 +435,42 @@ public partial class MainWindow : Window
         AssembledCodeBox.Text = _activeFile is null
             ? string.Empty
             : CodeAssembler.Assemble(_activeFile);
+    }
+
+    private bool SaveProjectToDisk(bool showConfirmation)
+    {
+        SaveEditorToActiveSubfile();
+        CommitVariableEdits();
+
+        if (!HasRepository() && !SelectRepository())
+            return false;
+
+        try
+        {
+            _storage.SaveProject(_project, _settings.GitRepositoryPath);
+            SaveStateText.Text = "Saved to disk";
+            StatusText.Text = "Project saved to .codeloom/project.json";
+
+            if (showConfirmation)
+            {
+                MessageBox.Show(
+                    $"Project saved to:\n{_storage.GetProjectFilePath(_settings.GitRepositoryPath)}",
+                    "Code Loom",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            return true;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                "Code Loom could not save the project.\n\n" + exception.Message,
+                "Save failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return false;
+        }
     }
 
     private void ApplyChanges_Click(object sender, RoutedEventArgs e)
@@ -343,6 +499,7 @@ public partial class MainWindow : Window
         _activeFile.Subfiles.Add(newSubfile);
         SubfileList.SelectedItem = newSubfile;
         RefreshAssembledCode();
+        SaveStateText.Text = "Changes not saved to disk";
         StatusText.Text = "Created a new virtual subfile";
     }
 
@@ -361,6 +518,7 @@ public partial class MainWindow : Window
         _activeFile.Subfiles.Remove(_activeSubfile);
         SubfileList.SelectedIndex = Math.Clamp(index - 1, 0, _activeFile.Subfiles.Count - 1);
         RefreshAssembledCode();
+        SaveStateText.Text = "Changes not saved to disk";
         StatusText.Text = "Subfile deleted";
     }
 
@@ -377,6 +535,7 @@ public partial class MainWindow : Window
         _activeFile.Subfiles.Move(index, index - 1);
         SubfileList.SelectedItem = _activeSubfile;
         RefreshAssembledCode();
+        SaveStateText.Text = "Changes not saved to disk";
         StatusText.Text = "Moved subfile up";
     }
 
@@ -393,6 +552,7 @@ public partial class MainWindow : Window
         _activeFile.Subfiles.Move(index, index + 1);
         SubfileList.SelectedItem = _activeSubfile;
         RefreshAssembledCode();
+        SaveStateText.Text = "Changes not saved to disk";
         StatusText.Text = "Moved subfile down";
     }
 
@@ -410,7 +570,101 @@ public partial class MainWindow : Window
             Meaning = "Explain what this variable represents."
         });
 
+        SaveStateText.Text = "Changes not saved to disk";
         StatusText.Text = "Added a variable definition";
+    }
+
+    private void ChooseRepository_Click(object sender, RoutedEventArgs e)
+    {
+        if (!SelectRepository())
+            return;
+
+        var existingProject = _storage.LoadProject(_settings.GitRepositoryPath);
+        if (existingProject is not null)
+        {
+            _project = existingProject;
+            RefreshEntireProjectUi();
+            SaveStateText.Text = "Loaded from disk";
+            StatusText.Text = "Git repository selected and existing Code Loom project loaded";
+        }
+        else
+        {
+            SaveProjectToDisk(false);
+            StatusText.Text = "Git repository selected and current project saved into it";
+        }
+    }
+
+    private void SaveProject_Click(object sender, RoutedEventArgs e)
+    {
+        SaveProjectToDisk(true);
+    }
+
+    private void LoadProject_Click(object sender, RoutedEventArgs e)
+    {
+        if (!HasRepository() && !SelectRepository())
+            return;
+
+        try
+        {
+            var loaded = _storage.LoadProject(_settings.GitRepositoryPath);
+            if (loaded is null)
+            {
+                MessageBox.Show(
+                    "No .codeloom/project.json exists in this repository yet.",
+                    "Code Loom",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            _project = loaded;
+            RefreshEntireProjectUi();
+            SaveStateText.Text = "Loaded from disk";
+            StatusText.Text = "Project loaded from disk";
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                "Code Loom could not load the project.\n\n" + exception.Message,
+                "Load failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private async void SyncGitHub_Click(object sender, RoutedEventArgs e)
+    {
+        if (!SaveProjectToDisk(false))
+            return;
+
+        StatusText.Text = "Syncing with GitHub...";
+        SaveStateText.Text = "Syncing...";
+
+        var result = await _git.SyncAsync(_settings.GitRepositoryPath);
+        if (!result.Success)
+        {
+            SaveStateText.Text = "Sync failed";
+            MessageBox.Show(result.Message, "GitHub sync failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "GitHub sync failed";
+            return;
+        }
+
+        try
+        {
+            var syncedProject = _storage.LoadProject(_settings.GitRepositoryPath);
+            if (syncedProject is not null)
+            {
+                _project = syncedProject;
+                RefreshEntireProjectUi();
+            }
+        }
+        catch
+        {
+            // The Git operation succeeded; keep the current in-memory project if reload fails.
+        }
+
+        SaveStateText.Text = "Synced with GitHub";
+        StatusText.Text = result.Message;
     }
 
     private void ResetDemo_Click(object sender, RoutedEventArgs e)
@@ -418,8 +672,8 @@ public partial class MainWindow : Window
         _activeFile = null;
         _activeSubfile = null;
         BuildDemoProject();
-        RefreshFileList();
-        FileList.SelectedIndex = 0;
+        RefreshEntireProjectUi();
+        SaveStateText.Text = "Changes not saved to disk";
         StatusText.Text = "Demo restored";
     }
 }
