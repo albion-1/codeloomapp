@@ -42,9 +42,7 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True" />
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -83,6 +81,18 @@
             <Setter Property="Padding" Value="8,7" />
             <Setter Property="Margin" Value="0,0,0,2" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+
+        <Style TargetType="TreeView">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <Style TargetType="TreeViewItem">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Padding" Value="4,5" />
+            <Setter Property="Margin" Value="0,1" />
         </Style>
 
         <Style TargetType="TabControl">
@@ -142,12 +152,7 @@
             </WrapPanel>
         </Grid>
 
-        <Border Grid.Row="1"
-                Background="{StaticResource PanelAltBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                Padding="10"
-                Margin="0,0,0,10">
+        <Border Grid.Row="1" Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="10" Margin="0,0,0,10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -156,28 +161,47 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="GitHubAccountText" Text="GitHub: not checked" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
-                <TextBlock x:Name="RepositoryPathText" Grid.Column="1" Text="No project repository selected"
-                           Margin="16,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                <TextBlock x:Name="SaveStateText" Grid.Column="2" Text="Unsaved session"
-                           Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <TextBlock x:Name="RepositoryPathText" Grid.Column="1" Text="No project repository selected" Margin="16,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="SaveStateText" Grid.Column="2" Text="Unsaved session" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0" />
                 <Button Grid.Column="3" Content="Refresh Account" Click="RefreshGitHubAccount_Click" Padding="8,4" Margin="0" />
             </Grid>
         </Border>
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="225" />
+                <ColumnDefinition Width="260" />
                 <ColumnDefinition Width="245" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0,0,10,0">
                 <DockPanel>
-                    <StackPanel DockPanel.Dock="Top" Margin="12,12,12,8">
-                        <TextBlock Text="PROJECT FILES" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" />
-                        <TextBlock Text="Unity-facing scripts" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
+                    <StackPanel DockPanel.Dock="Top" Margin="10,10,10,8">
+                        <TextBlock Text="PROJECT" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" />
+                        <Grid Margin="0,4,0,9">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ProjectNameText" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <Button Grid.Column="1" Content="Rename" Click="RenameProject_Click" Padding="7,4" Margin="6,0,0,0" />
+                        </Grid>
+
+                        <WrapPanel>
+                            <Button Content="+ Folder" Click="CreateFolder_Click" Padding="8,5" Margin="0,0,5,5" />
+                            <Button Content="+ File" Click="CreateFile_Click" Padding="8,5" Margin="0,0,5,5" />
+                            <Button Content="Rename" Click="RenameProjectItem_Click" Padding="8,5" Margin="0,0,5,5" />
+                            <Button Content="Delete" Click="DeleteProjectItem_Click" Padding="8,5" Margin="0,0,0,5" Foreground="#E7A3A3" />
+                        </WrapPanel>
+                        <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,5,0,0" />
                     </StackPanel>
-                    <ListBox x:Name="FileList" Margin="8" SelectionChanged="FileList_SelectionChanged" />
+
+                    <TreeView x:Name="ProjectTree"
+                              Margin="7,0,7,7"
+                              Loaded="ProjectTree_Loaded"
+                              SelectedItemChanged="ProjectTree_SelectedItemChanged" />
+
+                    <ListBox x:Name="FileList" Visibility="Collapsed" SelectionChanged="FileList_SelectionChanged" />
                 </DockPanel>
             </Border>
 
