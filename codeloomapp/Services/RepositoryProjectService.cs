@@ -29,8 +29,6 @@ public sealed class RepositoryProjectService
             .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase)
             ?? new Dictionary<string, CodeLoomFileMetadata>(StringComparer.OrdinalIgnoreCase);
 
-        // Carry Code Loom-only metadata through a physical rename when the scanner can
-        // confidently pair the old and new paths by a unique identical file hash.
         foreach (var rename in scan.Changes.Where(change => change.Kind == RepositoryCSharpChangeKind.Renamed))
         {
             if (metadataByPath.TryGetValue(rename.PreviousRelativePath, out var movedMetadata)
@@ -75,9 +73,6 @@ public sealed class RepositoryProjectService
                 }
                 else
                 {
-                    // Migration path for old project.json files: if exactly one legacy
-                    // Code Loom file has this physical file name, preserve its descriptions
-                    // and manual assembly choices while taking code from the real .cs file.
                     var candidates = legacyFiles
                         .Where(candidate => !matchedLegacy.Contains(candidate.File)
                                             && string.Equals(
@@ -92,6 +87,11 @@ public sealed class RepositoryProjectService
                     }
                 }
 
+                // The importer/assembler may normalize formatting even when the user has
+                // changed nothing. This separate baseline is what lets Save remain a true
+                // no-op until a Code Loom subfile is actually edited.
+                file.ProjectionHash = HashText(CodeAssembler.Assemble(file));
+
                 foreach (var warning in import.Warnings)
                     warnings.Add($"{file.RepositoryRelativePath}: {warning}");
 
@@ -103,14 +103,12 @@ public sealed class RepositoryProjectService
             }
         }
 
-        // Never discard an older Code Loom-only file simply because no physical source
-        // could be matched. It remains visible in-memory and the original full JSON is
-        // backed up before project.json is converted to metadata-only format.
         foreach (var legacy in legacyFiles.Where(candidate => !matchedLegacy.Contains(candidate.File)))
         {
             legacy.File.IsRepositoryBacked = false;
             legacy.File.IsLegacyUnmapped = true;
             legacy.File.RepositoryRelativePath = string.Empty;
+            legacy.File.ProjectionHash = HashText(CodeAssembler.Assemble(legacy.File));
 
             var folderName = string.IsNullOrWhiteSpace(legacy.Folder.Name)
                 ? "Legacy (unmapped)"
@@ -168,6 +166,17 @@ public sealed class RepositoryProjectService
 
             var assembled = CodeAssembler.Assemble(file);
             var assembledHash = HashText(assembled);
+            var projectionChanged = string.IsNullOrWhiteSpace(file.ProjectionHash)
+                                    || !string.Equals(
+                                        assembledHash,
+                                        file.ProjectionHash,
+                                        StringComparison.OrdinalIgnoreCase);
+
+            // Imported source is authoritative and may not be formatted exactly like
+            // Code Loom's assembly output. Never rewrite it merely because Save was clicked.
+            if (!projectionChanged)
+                continue;
+
             var exists = File.Exists(fullPath);
             var diskHash = exists ? RepositoryCSharpScanner.HashFile(fullPath) : string.Empty;
 
@@ -179,7 +188,7 @@ public sealed class RepositoryProjectService
                 {
                     conflicts.Add(new RepositorySourceConflict(
                         relativePath,
-                        "The physical .cs file changed outside Code Loom after it was loaded. The external edit was preserved."));
+                        "The physical .cs file changed outside Code Loom after it was loaded, and Code Loom also has edits for this file. The external edit was preserved."));
                     continue;
                 }
 
@@ -222,6 +231,7 @@ public sealed class RepositoryProjectService
 
             plan.File.RepositoryRelativePath = plan.RelativePath;
             plan.File.SourceHash = plan.AssembledHash;
+            plan.File.ProjectionHash = plan.AssembledHash;
             plan.File.IsRepositoryBacked = true;
         }
 
@@ -244,10 +254,11 @@ public sealed class RepositoryProjectService
         return project.Folders
             .SelectMany(folder => folder.Files)
             .Where(file => !file.IsLegacyUnmapped && !string.IsNullOrWhiteSpace(file.RepositoryRelativePath))
-            .Where(file => !string.Equals(
-                HashText(CodeAssembler.Assemble(file)),
-                file.SourceHash,
-                StringComparison.OrdinalIgnoreCase))
+            .Where(file => string.IsNullOrWhiteSpace(file.ProjectionHash)
+                           || !string.Equals(
+                               HashText(CodeAssembler.Assemble(file)),
+                               file.ProjectionHash,
+                               StringComparison.OrdinalIgnoreCase))
             .Select(file => NormalizeRelativePath(file.RepositoryRelativePath))
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
