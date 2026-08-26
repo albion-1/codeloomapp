@@ -174,9 +174,6 @@ public partial class MainWindow
             RefreshEntireProjectUi();
             RefreshProjectTree();
 
-            // Force the normal autosave pass to persist the restored state. The
-            // history service already points at this snapshot, so this will not
-            // create a duplicate history entry.
             _lastAutosavedFingerprint = string.Empty;
             SaveStateText.Text = "Unsaved · history restored";
             StatusText.Text = $"{status}: {entry.Label}";
@@ -199,8 +196,6 @@ public partial class MainWindow
         if (!control)
             return;
 
-        // Keep normal text-editor undo/redo completely intact. Project history only
-        // takes over when focus is outside an editable text surface.
         if (CodeBox.IsKeyboardFocusWithin || Keyboard.FocusedElement is TextBoxBase)
             return;
 
@@ -254,7 +249,7 @@ public partial class MainWindow
         var importButton = new Button
         {
             Content = "+ Import C#",
-            Padding = new Thickness(7, 4),
+            Padding = new Thickness(7, 4, 7, 4),
             Margin = new Thickness(5, 0, 0, 5)
         };
         importButton.Click += ImportExistingCSharp_Click;
