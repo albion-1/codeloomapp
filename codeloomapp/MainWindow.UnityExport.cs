@@ -22,6 +22,11 @@ public partial class MainWindow
         base.OnContentRendered(e);
         EnsureUnityExportUi();
         InstallUnityExportToolbarButton();
+
+        // If startup ordering caused the Git/status stack to be installed a moment
+        // later, a future activation gets another harmless chance to attach the
+        // collapsed Unity details panel. The toolbar export remains available either way.
+        Activated += (_, _) => EnsureUnityExportUi();
     }
 
     private void EnsureUnityExportUi()
@@ -29,22 +34,11 @@ public partial class MainWindow
         if (_unityExportUiInstalled)
             return;
 
-        if (GitHubAccountText.Parent is not Grid statusGrid)
-            return;
-
-        StackPanel? statusStack = statusGrid.Parent as StackPanel;
-        if (statusStack is null && statusGrid.Parent is Border statusBorder)
+        if (GitHubAccountText.Parent is not Grid statusGrid
+            || statusGrid.Parent is not StackPanel statusStack)
         {
-            // Fallback for startup timing: preserve the existing status row and
-            // turn its border into the same stacked layout used by Git/history.
-            statusBorder.Child = null;
-            statusStack = new StackPanel();
-            statusStack.Children.Add(statusGrid);
-            statusBorder.Child = statusStack;
-        }
-
-        if (statusStack is null)
             return;
+        }
 
         _unityExportUiInstalled = true;
         _unityExportView = new UnityExportView();
