@@ -5,6 +5,11 @@ namespace codeloomapp.Services;
 
 public sealed class GitHubCliService
 {
+    private static readonly string CodeLoomGitHubConfigDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "CodeLoom",
+        "GitHubCli");
+
     public async Task<GitHubCliResult> CheckAvailabilityAsync()
     {
         var result = await RunAsync(null, "--version");
@@ -27,10 +32,10 @@ public sealed class GitHubCliService
         if (existing.Success)
             return await FinishAuthenticationAsync(existing.Message, null, "Already signed in to GitHub.");
 
-        // Browser authentication must be interactive. More importantly, do not trust
-        // only the helper process exit code: on some Windows setups gh can return a
-        // non-zero exit after GitHub accepted the device code. We verify the account
-        // with both `gh auth status` and a real API call before deciding it failed.
+        // Browser authentication needs a visible console, but every gh invocation must
+        // also see the same writable config directory. A dedicated Code Loom GH_CONFIG_DIR
+        // prevents the interactive helper and later verification process from silently
+        // looking at different GitHub CLI state.
         var login = await RunInteractiveAsync(
             null,
             "auth login --hostname github.com --git-protocol https --web --skip-ssh-key");
@@ -42,17 +47,55 @@ public sealed class GitHubCliService
                 ? $"The browser sign-in helper exited with code {login.ExitCode}."
                 : login.Output;
 
+            var storageHint = LooksLikeNoSavedAccount(verified.DiagnosticDetails)
+                ? Environment.NewLine +
+                  "The device code may have been accepted by GitHub, but GitHub CLI did not retain the account. " +
+                  "This often points to local credential-storage trouble. Code Loom can retry using GitHub CLI's file-based credential storage."
+                : string.Empty;
+
             return GitHubCliResult.Fail(
                 "Browser sign-in verification",
-                "GitHub did not leave Code Loom with a usable authenticated account after the browser/device-code flow. " +
-                "You can retry the browser flow or use the Personal Access Token fallback.",
-                helperDetail + Environment.NewLine + verified.DiagnosticDetails);
+                "GitHub did not leave Code Loom with a usable authenticated account after the browser/device-code flow." + storageHint,
+                helperDetail + Environment.NewLine + BuildAuthenticationEnvironmentDiagnostic() + Environment.NewLine + verified.DiagnosticDetails);
         }
 
         return await FinishAuthenticationAsync(
             verified.Message,
             login,
             "GitHub browser authentication completed.");
+    }
+
+    public async Task<GitHubCliResult> SignInWithBrowserFileStorageAsync()
+    {
+        var available = await CheckAvailabilityAsync();
+        if (!available.Success)
+            return available;
+
+        var login = await RunInteractiveAsync(
+            null,
+            "auth login --hostname github.com --git-protocol https --web --skip-ssh-key --insecure-storage");
+
+        var verified = await VerifyAuthenticatedUserAsync();
+        if (!verified.Success)
+        {
+            return GitHubCliResult.Fail(
+                "Browser sign-in fallback",
+                "The fallback browser sign-in also failed to leave a usable GitHub account.",
+                login.Output + Environment.NewLine + BuildAuthenticationEnvironmentDiagnostic() + Environment.NewLine + verified.DiagnosticDetails);
+        }
+
+        var finished = await FinishAuthenticationAsync(
+            verified.Message,
+            login,
+            "GitHub browser authentication completed with file-based credential storage.");
+
+        return finished with
+        {
+            Warning = JoinWarnings(
+                "Windows secure credential storage did not work for the normal browser flow, so GitHub CLI stored this login in its local Code Loom configuration directory. " +
+                "That file is inside your Windows user profile and is not part of any Code Loom project or Git repository.",
+                finished.Warning)
+        };
     }
 
     public async Task<GitHubCliResult> SignInWithTokenAsync(string token)
@@ -76,34 +119,75 @@ public sealed class GitHubCliService
                 "The token contains whitespace. Copy the token again directly from GitHub and paste only the token value.");
         }
 
-        // The token is sent through standard input. It is never placed in process
-        // arguments, settings.json, project.json, status text, or Code Loom logs.
+        // First try GitHub CLI's normal secure credential storage. The token travels
+        // only through stdin and never appears in process arguments or diagnostics.
         var login = await RunWithStandardInputAsync(
             null,
             "auth login --hostname github.com --git-protocol https --with-token",
             token + Environment.NewLine);
 
-        if (!login.Success)
+        var verified = login.Success
+            ? await VerifyAuthenticatedUserAsync()
+            : GitHubCliResult.Fail("Personal Access Token verification", "GitHub CLI did not complete token authentication.", login.Output);
+
+        var usedFileStorageFallback = false;
+        if (!login.Success || !verified.Success)
         {
-            return GitHubCliResult.Fail(
-                "Personal Access Token acceptance",
-                "GitHub CLI rejected the token. For the broadest Code Loom compatibility, use a classic Personal Access Token with the permissions GitHub CLI requires for the repositories you want to manage.",
-                login.Output);
+            var shouldRetryStorage = LooksLikeCredentialStorageFailure(login.Output)
+                                     || (login.Success && LooksLikeNoSavedAccount(verified.DiagnosticDetails));
+
+            if (!shouldRetryStorage)
+            {
+                return GitHubCliResult.Fail(
+                    "Personal Access Token acceptance",
+                    "GitHub CLI rejected the token. Check that it is a current classic Personal Access Token and that it has the permissions needed for the repositories you want to manage.",
+                    login.Output + Environment.NewLine + verified.DiagnosticDetails);
+            }
+
+            // If Windows credential storage is the failing component, retry once using
+            // GitHub CLI's documented file-based storage. This makes the PAT fallback
+            // useful on PCs where the normal credential manager handoff is broken.
+            var fallback = await RunWithStandardInputAsync(
+                null,
+                "auth login --hostname github.com --git-protocol https --with-token --insecure-storage",
+                token + Environment.NewLine);
+
+            if (!fallback.Success)
+            {
+                return GitHubCliResult.Fail(
+                    "Personal Access Token fallback",
+                    "GitHub CLI could not authenticate with the token even after bypassing Windows credential storage.",
+                    fallback.Output);
+            }
+
+            login = fallback;
+            verified = await VerifyAuthenticatedUserAsync();
+            usedFileStorageFallback = true;
         }
 
-        var verified = await VerifyAuthenticatedUserAsync();
         if (!verified.Success)
         {
             return GitHubCliResult.Fail(
                 "Personal Access Token verification",
-                "GitHub CLI accepted the token, but Code Loom could not verify it with the GitHub API.",
-                verified.DiagnosticDetails);
+                "GitHub CLI accepted the token command, but Code Loom could not verify a working GitHub API account afterward.",
+                BuildAuthenticationEnvironmentDiagnostic() + Environment.NewLine + verified.DiagnosticDetails);
         }
 
-        return await FinishAuthenticationAsync(
+        var finished = await FinishAuthenticationAsync(
             verified.Message,
             login,
             "GitHub token authentication completed.");
+
+        if (!usedFileStorageFallback)
+            return finished;
+
+        return finished with
+        {
+            Warning = JoinWarnings(
+                "Windows secure credential storage was not usable, so GitHub CLI stored this authentication in its local Code Loom configuration directory. " +
+                "Code Loom never writes the token into project.json, settings.json, Git commits, or diagnostic text.",
+                finished.Warning)
+        };
     }
 
     public async Task<GitHubCliResult> GetSignedInUserAsync()
@@ -197,8 +281,6 @@ public sealed class GitHubCliService
                 status.Output);
         }
 
-        // A successful status check alone can be stale or incomplete. This API request
-        // proves that the credential actually works before Code Loom says Connected.
         var user = await RunAsync(null, "api user --jq .login");
         if (!user.Success || string.IsNullOrWhiteSpace(user.Output))
         {
@@ -227,8 +309,6 @@ public sealed class GitHubCliService
         var setup = await EnsureGitCredentialIntegrationAsync();
         if (!setup.Success)
         {
-            // Authentication itself is still valid. This used to turn a successful
-            // browser login into a misleading "GitHub sign-in failed" dialog.
             warnings.Add(setup.Message +
                          (string.IsNullOrWhiteSpace(setup.DiagnosticDetails)
                              ? string.Empty
@@ -252,10 +332,6 @@ public sealed class GitHubCliService
                 git.DiagnosticDetails);
         }
 
-        // Configure normal HTTPS Git commands to ask the same authenticated GitHub CLI
-        // for credentials. RunProcessAsync temporarily adds a discovered Git folder to
-        // PATH so bundled/Visual-Studio Git installations can work even when `git` is
-        // not globally registered in the user's PATH.
         var setup = await RunAsync(null, "auth setup-git");
         return setup.Success
             ? GitHubCliResult.Ok("Git credentials are connected to GitHub CLI.", "Git credential integration")
@@ -332,6 +408,7 @@ public sealed class GitHubCliService
     {
         try
         {
+            EnsureGitHubCliEnvironment();
             var startInfo = new ProcessStartInfo
             {
                 FileName = ResolveGitHubCliExecutable(),
@@ -382,8 +459,6 @@ public sealed class GitHubCliService
             Path.Combine(localAppData, "Programs", "Git", "cmd", "git.exe")
         };
 
-        // Visual Studio commonly carries its own Git. Code Loom can use it even when
-        // the installer did not add Git to the global PATH.
         foreach (var version in new[] { "2026", "18", "2022" })
         {
             foreach (var edition in new[] { "Community", "Professional", "Enterprise", "BuildTools" })
@@ -440,6 +515,7 @@ public sealed class GitHubCliService
     {
         try
         {
+            EnsureGitHubCliEnvironment();
             var startInfo = new ProcessStartInfo
             {
                 FileName = fileName,
@@ -479,6 +555,67 @@ public sealed class GitHubCliService
         {
             return new CommandResult(false, exception.Message, -1);
         }
+    }
+
+    private static void EnsureGitHubCliEnvironment()
+    {
+        try
+        {
+            Directory.CreateDirectory(CodeLoomGitHubConfigDirectory);
+            Environment.SetEnvironmentVariable(
+                "GH_CONFIG_DIR",
+                CodeLoomGitHubConfigDirectory,
+                EnvironmentVariableTarget.Process);
+        }
+        catch
+        {
+            // If the custom directory cannot be prepared, GitHub CLI will use its
+            // normal Windows configuration path and the diagnostic text will say so.
+        }
+    }
+
+    private static string BuildAuthenticationEnvironmentDiagnostic()
+    {
+        var configured = Environment.GetEnvironmentVariable("GH_CONFIG_DIR");
+        var configDirectory = string.IsNullOrWhiteSpace(configured)
+            ? "GitHub CLI default Windows configuration directory"
+            : configured;
+
+        var exists = Directory.Exists(configDirectory);
+        return $"GitHub CLI config directory: {configDirectory}{Environment.NewLine}" +
+               $"Config directory exists: {exists}";
+    }
+
+    private static bool LooksLikeNoSavedAccount(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        return text.Contains("not logged into any GitHub hosts", StringComparison.OrdinalIgnoreCase)
+               || text.Contains("not logged in", StringComparison.OrdinalIgnoreCase)
+               || text.Contains("no accounts", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeCredentialStorageFailure(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        return text.Contains("credential", StringComparison.OrdinalIgnoreCase)
+               || text.Contains("keyring", StringComparison.OrdinalIgnoreCase)
+               || text.Contains("keychain", StringComparison.OrdinalIgnoreCase)
+               || text.Contains("wincred", StringComparison.OrdinalIgnoreCase)
+               || text.Contains("secret", StringComparison.OrdinalIgnoreCase)
+               || text.Contains("secure storage", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string JoinWarnings(string first, string second)
+    {
+        if (string.IsNullOrWhiteSpace(first))
+            return second ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(second))
+            return first;
+        return first + Environment.NewLine + Environment.NewLine + second;
     }
 
     private static void AddDiscoveredGitToPath(ProcessStartInfo startInfo)
