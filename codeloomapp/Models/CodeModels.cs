@@ -75,4 +75,12 @@ public sealed class VariableDefinition
     public string DefaultValue { get; set; } = string.Empty;
     public string DeclaredIn { get; set; } = string.Empty;
     public string Meaning { get; set; } = string.Empty;
+
+    // These fields make the Variables view a projection of the actual C# source
+    // instead of a separate documentation-only list.
+    public bool IsCodeBacked { get; set; }
+    public string Access { get; set; } = string.Empty;
+    public string Modifiers { get; set; } = string.Empty;
+    public string SourceName { get; set; } = string.Empty;
+    public int SourceLine { get; set; }
 }
