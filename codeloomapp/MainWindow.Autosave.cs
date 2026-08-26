@@ -22,6 +22,7 @@ public partial class MainWindow
 
         TryRestoreRecoverySnapshot();
         InstallAutosaveUiHooks();
+        InitializeProjectHistory();
 
         _lastAutosavedFingerprint = _storage.SerializeProject(_project);
         _autosaveTimer.Tick += AutosaveTimer_Tick;
@@ -100,6 +101,11 @@ public partial class MainWindow
 
         if (string.Equals(fingerprint, _lastAutosavedFingerprint, StringComparison.Ordinal))
             return;
+
+        // Project history is local and independent from Git. Capture the state even
+        // if the later repository write fails, so a failed autosave still leaves a
+        // recoverable checkpoint on this PC.
+        CaptureProjectHistory(fingerprint, DescribeHistoryChange());
 
         _autosaveBusy = true;
         SaveStateText.Text = "Saving...";
