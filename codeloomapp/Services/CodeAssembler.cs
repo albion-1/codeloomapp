@@ -97,7 +97,30 @@ public static class CodeAssembler
         if (file.UsingStatements.Any(statement => !string.IsNullOrWhiteSpace(statement)))
             builder.AppendLine();
 
-        builder.Append("public class ")
+        if (!string.IsNullOrWhiteSpace(file.Namespace))
+        {
+            builder.Append("namespace ")
+                   .Append(file.Namespace.Trim())
+                   .AppendLine(";");
+            builder.AppendLine();
+        }
+
+        if (!string.IsNullOrWhiteSpace(file.TypeAttributes))
+        {
+            foreach (var line in NormalizeLines(file.TypeAttributes))
+                builder.AppendLine(line);
+        }
+
+        var typeModifiers = string.IsNullOrWhiteSpace(file.TypeModifiers)
+            ? string.Empty
+            : file.TypeModifiers.Trim() + " ";
+        var typeKind = string.IsNullOrWhiteSpace(file.TypeKind)
+            ? "class"
+            : file.TypeKind.Trim();
+
+        builder.Append(typeModifiers)
+               .Append(typeKind)
+               .Append(' ')
                .Append(string.IsNullOrWhiteSpace(file.ClassName) ? "UnnamedClass" : file.ClassName.Trim());
 
         if (!string.IsNullOrWhiteSpace(file.BaseClass))
@@ -205,11 +228,12 @@ public static class CodeAssembler
 
             if (!ControlFlowNames.Contains(methodName))
             {
-                if (string.Equals(methodName, file.ClassName, StringComparison.Ordinal))
+                var plainClassName = file.ClassName.Split('<')[0].Trim();
+                if (string.Equals(methodName, plainClassName, StringComparison.Ordinal))
                 {
                     return new AssemblyClassification(
                         AssemblySections.Constructors,
-                        $"Detected the {file.ClassName} constructor.");
+                        $"Detected the {plainClassName} constructor.");
                 }
 
                 if (UnityCallbacks.Contains(methodName))
@@ -322,6 +346,15 @@ public static class CodeAssembler
 
         foreach (var line in normalized.Split('\n'))
             builder.Append("    ").AppendLine(line);
+    }
+
+    private static IEnumerable<string> NormalizeLines(string value)
+    {
+        return value
+            .Replace("\r\n", "\n")
+            .Replace('\r', '\n')
+            .Split('\n')
+            .Select(line => line.TrimEnd());
     }
 }
 
