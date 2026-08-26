@@ -114,12 +114,12 @@ public sealed class RepositoryCSharpScanner
         {
             var directory = pending.Pop();
 
-            IEnumerable<string> childDirectories;
-            IEnumerable<string> files;
+            string[] childDirectories;
+            string[] files;
             try
             {
-                childDirectories = Directory.EnumerateDirectories(directory);
-                files = Directory.EnumerateFiles(directory, "*.cs", SearchOption.TopDirectoryOnly);
+                childDirectories = Directory.GetDirectories(directory);
+                files = Directory.GetFiles(directory, "*.cs", SearchOption.TopDirectoryOnly);
             }
             catch (UnauthorizedAccessException)
             {
