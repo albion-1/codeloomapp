@@ -27,6 +27,21 @@ public partial class MainWindow
 
     private static void ConfigureEditor(TextEditor editor, bool readOnly)
     {
+        var editorBackground = BrushFromHex("#0D1013");
+        var editorForeground = BrushFromHex("#D7DCE2");
+
+        // AvalonEdit ships with Windows system colors by default, so explicitly
+        // theme both the outer control and its inner TextArea to keep Code Loom dark.
+        editor.Background = editorBackground;
+        editor.Foreground = editorForeground;
+        editor.BorderBrush = Brushes.Transparent;
+        editor.BorderThickness = new Thickness(0);
+        editor.FocusVisualStyle = null;
+
+        editor.TextArea.Background = editorBackground;
+        editor.TextArea.Foreground = editorForeground;
+        editor.TextArea.FocusVisualStyle = null;
+
         editor.Options.ConvertTabsToSpaces = true;
         editor.Options.IndentationSize = 4;
         editor.Options.EnableHyperlinks = false;
@@ -36,6 +51,7 @@ public partial class MainWindow
         editor.SyntaxHighlighting = GetSoftCSharpHighlighting();
         editor.LineNumbersForeground = BrushFromHex("#58616B");
         editor.TextArea.SelectionBrush = BrushFromHex("#344554");
+        editor.TextArea.SelectionForeground = editorForeground;
         editor.TextArea.SelectionBorder = null;
         editor.TextArea.TextView.CurrentLineBackground = BrushFromHex("#11171D");
         editor.TextArea.TextView.CurrentLineBorder = new Pen(BrushFromHex("#1A222A"), 1);
