@@ -16,31 +16,17 @@ public partial class MainWindow
             return;
 
         _githubAccountActionBusy = true;
-        GitHubAccountText.Text = "GitHub: sign-in in progress...";
-        StatusText.Text = "Opening GitHub's sign-in helper and browser...";
-
         try
         {
-            var result = await _githubCli.SignInAsync();
-            if (!result.Success)
+            var current = await _githubCli.GetSignedInUserAsync();
+            if (current.Success)
             {
-                MessageBox.Show(
-                    this,
-                    result.Message,
-                    "GitHub sign-in failed",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-                GitHubAccountText.Text = "GitHub: not signed in";
-                StatusText.Text = "GitHub sign-in failed";
+                GitHubAccountText.Text = $"GitHub: {current.Message}";
+                StatusText.Text = $"GitHub is already connected as {current.Message}";
                 return;
             }
 
-            var user = await _githubCli.GetSignedInUserAsync();
-            GitHubAccountText.Text = user.Success
-                ? $"GitHub: {user.Message}"
-                : "GitHub: signed in";
-
-            StatusText.Text = "GitHub connected";
+            await PromptForGitHubAuthenticationAsync();
         }
         finally
         {
@@ -60,27 +46,23 @@ public partial class MainWindow
             var signIn = await _githubCli.GetSignedInUserAsync();
             if (!signIn.Success)
             {
-                GitHubAccountText.Text = "GitHub: sign-in in progress...";
-                StatusText.Text = "Sign in to GitHub to create the project...";
-                var login = await _githubCli.SignInAsync();
-                if (!login.Success)
+                var connected = await PromptForGitHubAuthenticationAsync();
+                if (!connected)
                 {
-                    MessageBox.Show(
-                        this,
-                        login.Message,
-                        "GitHub sign-in failed",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                    GitHubAccountText.Text = "GitHub: not signed in";
-                    StatusText.Text = "GitHub sign-in failed";
+                    StatusText.Text = "GitHub project creation cancelled";
                     return;
                 }
 
                 signIn = await _githubCli.GetSignedInUserAsync();
             }
 
-            if (signIn.Success)
-                GitHubAccountText.Text = $"GitHub: {signIn.Message}";
+            if (!signIn.Success)
+            {
+                ShowGitHubAuthenticationFailure(signIn);
+                return;
+            }
+
+            GitHubAccountText.Text = $"GitHub: {signIn.Message}";
 
             var projectDialog = new GitHubProjectDialog { Owner = this };
             if (projectDialog.ShowDialog() != true)
@@ -134,11 +116,11 @@ public partial class MainWindow
                 {
                     MessageBox.Show(
                         this,
-                        create.Message,
+                        FormatGitHubDiagnostic(create),
                         "Repository creation failed",
                         MessageBoxButton.OK,
                         MessageBoxImage.Error);
-                    StatusText.Text = "GitHub repository creation failed";
+                    StatusText.Text = $"GitHub repository creation stopped at: {create.Stage}";
                     return;
                 }
 
@@ -171,11 +153,112 @@ public partial class MainWindow
         }
     }
 
+    private async Task<bool> PromptForGitHubAuthenticationAsync()
+    {
+        var dialog = new GitHubAuthDialog { Owner = this };
+        if (dialog.ShowDialog() != true)
+        {
+            GitHubAccountText.Text = "GitHub: not signed in";
+            StatusText.Text = "GitHub sign-in cancelled";
+            return false;
+        }
+
+        GitHubCliResult result;
+        if (dialog.AuthenticationMethod == GitHubAuthenticationMethod.PersonalAccessToken)
+        {
+            GitHubAccountText.Text = "GitHub: checking token...";
+            StatusText.Text = "Authenticating with the Personal Access Token...";
+
+            var token = dialog.TakeToken();
+            try
+            {
+                result = await _githubCli.SignInWithTokenAsync(token);
+            }
+            finally
+            {
+                // The token is never persisted by Code Loom. Drop our temporary
+                // managed reference as soon as the GitHub CLI call has completed.
+                token = string.Empty;
+            }
+        }
+        else
+        {
+            GitHubAccountText.Text = "GitHub: browser sign-in in progress...";
+            StatusText.Text = "Complete GitHub verification in the opened sign-in window/browser...";
+            result = await _githubCli.SignInAsync();
+        }
+
+        if (!result.Success)
+        {
+            ShowGitHubAuthenticationFailure(result);
+            GitHubAccountText.Text = "GitHub: not signed in";
+            StatusText.Text = $"GitHub sign-in stopped at: {result.Stage}";
+            return false;
+        }
+
+        var user = await _githubCli.GetSignedInUserAsync();
+        if (!user.Success)
+        {
+            ShowGitHubAuthenticationFailure(user);
+            GitHubAccountText.Text = "GitHub: authentication could not be verified";
+            StatusText.Text = "GitHub account verification failed";
+            return false;
+        }
+
+        GitHubAccountText.Text = $"GitHub: {user.Message}";
+        StatusText.Text = $"GitHub connected as {user.Message}";
+
+        if (result.HasWarning)
+        {
+            MessageBox.Show(
+                this,
+                result.Warning,
+                "GitHub connected — setup warning",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
+        return true;
+    }
+
+    private void ShowGitHubAuthenticationFailure(GitHubCliResult result)
+    {
+        MessageBox.Show(
+            this,
+            FormatGitHubDiagnostic(result),
+            "GitHub authentication",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+    }
+
+    private static string FormatGitHubDiagnostic(GitHubCliResult result)
+    {
+        var message = string.IsNullOrWhiteSpace(result.Stage)
+            ? result.Message
+            : $"Stage: {result.Stage}\n\n{result.Message}";
+
+        if (!string.IsNullOrWhiteSpace(result.DiagnosticDetails))
+        {
+            var detail = result.DiagnosticDetails.Trim();
+            if (detail.Length > 2200)
+                detail = detail[..2200] + "\n…additional diagnostic text omitted.";
+
+            message += "\n\nTechnical detail:\n" + detail;
+        }
+
+        message += "\n\nCode Loom does not include Personal Access Tokens in this diagnostic text or save them in project/settings files.";
+        return message;
+    }
+
     private async void RefreshGitHubAccount_Click(object sender, RoutedEventArgs e)
     {
         var user = await _githubCli.GetSignedInUserAsync();
         GitHubAccountText.Text = user.Success
             ? $"GitHub: {user.Message}"
             : "GitHub: not signed in";
+
+        StatusText.Text = user.Success
+            ? $"GitHub account verified as {user.Message}"
+            : $"GitHub account check failed at: {user.Stage}";
     }
 }
