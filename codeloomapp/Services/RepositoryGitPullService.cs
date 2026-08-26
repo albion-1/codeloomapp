@@ -4,8 +4,28 @@ namespace codeloomapp.Services;
 
 public sealed class RepositoryGitPullService
 {
+    private const string ProjectMetadataPath = ".codeloom/project.json";
+    private const string SafetyStashMessage = "Code Loom automatic pull safety";
+
     public async Task<GitSyncResult> PullAsync(string repositoryPath)
     {
+        // 0.1.7 could leave project.json conflicted when a safety stash was restored
+        // after GitHub had also changed Code Loom metadata. project.json is generated
+        // metadata, not C# source, so repair that exact interrupted state first. Any
+        // conflict involving real source or another repository file still stops here.
+        var repair = await RepairCodeLoomMetadataConflictAsync(repositoryPath);
+        if (!repair.Success)
+            return repair;
+
+        // Code Loom rewrites project.json as its local metadata index. It should never
+        // be part of the Git safety stash because the remote version can legitimately
+        // change whenever another Code Loom/ChatGPT session reorganizes source files.
+        // The MainWindow keeps the semantic metadata in memory/recovery and merges it
+        // back after Pull, so the physical project.json can safely return to HEAD here.
+        var metadataReset = await ResetWorkingMetadataToHeadAsync(repositoryPath);
+        if (!metadataReset.Success)
+            return metadataReset;
+
         var initial = await RunGitAsync(
             repositoryPath,
             "status",
@@ -25,7 +45,7 @@ public sealed class RepositoryGitPullService
                 "push",
                 "--include-untracked",
                 "--message",
-                "Code Loom automatic pull safety");
+                SafetyStashMessage);
             if (!stash.Success)
             {
                 return GitSyncResult.Fail(
@@ -124,6 +144,100 @@ public sealed class RepositoryGitPullService
                 : $"Applied {behind} incoming GitHub commits." + localNote);
     }
 
+    public static async Task<GitSyncResult> RepairCodeLoomMetadataConflictAsync(string repositoryPath)
+    {
+        var unresolved = await RunGitAsync(repositoryPath, "diff", "--name-only", "--diff-filter=U");
+        if (!unresolved.Success)
+            return GitSyncResult.Fail("Could not inspect unresolved Git files:\n" + unresolved.Output);
+
+        var conflicts = SplitPaths(unresolved.Output);
+        if (conflicts.Count == 0)
+            return GitSyncResult.Ok("No interrupted Code Loom metadata conflict found.");
+
+        var nonMetadata = conflicts
+            .Where(path => !string.Equals(path, ProjectMetadataPath, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (nonMetadata.Count > 0)
+        {
+            var shown = string.Join("\n", nonMetadata.Take(8).Select(path => "• " + path));
+            return GitSyncResult.Fail(
+                "Git has a real unresolved repository conflict, so Code Loom will not guess which source should win. " +
+                "Resolve these files first:\n\n" + shown);
+        }
+
+        var restore = await RunGitAsync(
+            repositoryPath,
+            "restore",
+            "--source=HEAD",
+            "--staged",
+            "--worktree",
+            "--",
+            ProjectMetadataPath);
+        if (!restore.Success)
+        {
+            return GitSyncResult.Fail(
+                "Code Loom recognized the leftover conflict as its own generated project metadata, but Git could not repair it automatically.\n\n" +
+                restore.Output);
+        }
+
+        // A failed stash pop keeps the stash. Once project.json is restored to the
+        // post-Pull HEAD and no other file is conflicted, every non-conflicting stash
+        // change has already been applied to the working tree. Drop only Code Loom's
+        // own top safety stash so it cannot cause another false conflict later.
+        var topStash = await RunGitAsync(repositoryPath, "stash", "list", "-n", "1", "--format=%gd%x09%s");
+        if (topStash.Success && topStash.Output.Contains(SafetyStashMessage, StringComparison.OrdinalIgnoreCase))
+            _ = await RunGitAsync(repositoryPath, "stash", "drop", "stash@{0}");
+
+        return GitSyncResult.Ok("Recovered the interrupted Code Loom metadata restore.");
+    }
+
+    private static async Task<GitSyncResult> ResetWorkingMetadataToHeadAsync(string repositoryPath)
+    {
+        var metadataStatus = await RunGitAsync(
+            repositoryPath,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--",
+            ProjectMetadataPath);
+        if (!metadataStatus.Success)
+            return GitSyncResult.Fail("Could not inspect Code Loom project metadata before Pull:\n" + metadataStatus.Output);
+
+        if (string.IsNullOrWhiteSpace(metadataStatus.Output))
+            return GitSyncResult.Ok("Code Loom metadata is already clean.");
+
+        var tracked = await RunGitAsync(repositoryPath, "ls-files", "--error-unmatch", "--", ProjectMetadataPath);
+        if (tracked.Success)
+        {
+            var restore = await RunGitAsync(
+                repositoryPath,
+                "restore",
+                "--source=HEAD",
+                "--staged",
+                "--worktree",
+                "--",
+                ProjectMetadataPath);
+            return restore.Success
+                ? GitSyncResult.Ok("Prepared generated Code Loom metadata for Pull.")
+                : GitSyncResult.Fail("Could not prepare generated Code Loom metadata for Pull:\n" + restore.Output);
+        }
+
+        try
+        {
+            var fullPath = Path.Combine(
+                repositoryPath,
+                ProjectMetadataPath.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(fullPath))
+                File.Delete(fullPath);
+            return GitSyncResult.Ok("Prepared untracked Code Loom metadata for Pull.");
+        }
+        catch (Exception exception)
+        {
+            return GitSyncResult.Fail(
+                "Could not temporarily clear untracked Code Loom metadata before Pull.\n" + exception.Message);
+        }
+    }
+
     private static async Task<GitSyncResult> FailAndRestoreAsync(
         string repositoryPath,
         bool stashCreated,
@@ -152,9 +266,20 @@ public sealed class RepositoryGitPullService
             return GitSyncResult.Ok("Local working files restored.");
 
         return GitSyncResult.Fail(
-            "GitHub changes may already be present locally, but Git found a conflict while restoring the files that existed before Pull. " +
-            "Git keeps the safety stash when this happens, so those local files are still recoverable. " +
-            "Code Loom did not intentionally delete them.\n\n" + restore.Output);
+            "GitHub changes were applied, but one of the real local working files also changed on GitHub. " +
+            "Git kept the safety stash so the local version is still recoverable. Code Loom will not choose between two C# versions automatically.\n\n" +
+            restore.Output);
+    }
+
+    private static List<string> SplitPaths(string output)
+    {
+        return output
+            .Replace("\r\n", "\n")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(path => path.Trim().Trim('"').Replace('\\', '/').TrimStart('/'))
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static void ParseAheadBehind(string output, out int ahead, out int behind)
@@ -196,7 +321,7 @@ public sealed class RepositoryGitPullService
             var errorTask = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
 
-            var output = (await outputTask).Trim();
+            var output = (await outputTask).TrimEnd();
             var error = (await errorTask).Trim();
             return new GitCommandResult(
                 process.ExitCode,
