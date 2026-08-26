@@ -22,10 +22,12 @@ public sealed class CodeFile
     public string ClassName { get; set; } = string.Empty;
     public string BaseClass { get; set; } = "MonoBehaviour";
 
-    // Physical repository identity. Ordinary .cs files are the canonical source of
-    // code; Code Loom keeps this path/hash so it can safely project them into subfiles.
+    // Physical repository identity. SourceHash describes the actual .cs bytes that
+    // were loaded. ProjectionHash describes the Code Loom assembly at that moment.
+    // Keeping them separate prevents a no-op Save from reformatting imported source.
     public string RepositoryRelativePath { get; set; } = string.Empty;
     public string SourceHash { get; set; } = string.Empty;
+    public string ProjectionHash { get; set; } = string.Empty;
     public bool IsRepositoryBacked { get; set; }
     public bool IsLegacyUnmapped { get; set; }
 
