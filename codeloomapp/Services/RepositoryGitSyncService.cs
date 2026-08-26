@@ -10,17 +10,16 @@ public sealed class RepositoryGitSyncService
         if (!status.Success)
             return GitSyncResult.Fail("Could not inspect Git status:\n" + status.Output);
 
-        var changedPaths = ParseChangedPaths(status.Output).ToList();
+        var changedPaths = ParseChangedPaths(status.Output)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var managed = changedPaths.Where(IsManagedPath).ToList();
         var unrelated = changedPaths.Where(path => !IsManagedPath(path)).ToList();
-        if (unrelated.Count > 0)
-        {
-            var shown = string.Join("\n", unrelated.Take(8).Select(path => "• " + path));
-            return GitSyncResult.Fail(
-                "Code Loom found local changes outside physical C# source and its own metadata/export paths. " +
-                "Those files were left untouched. Commit, stash, or discard them before Push.\n\n" + shown);
-        }
 
-        foreach (var path in changedPaths)
+        // Push only stages source Code Loom actually owns. Other repository files are
+        // allowed to remain modified locally; Code Loom no longer demands that the user
+        // delete, stash, or commit them just to push C# work.
+        foreach (var path in managed)
         {
             var add = await RunGitAsync(repositoryPath, "add", "--all", "--", path);
             if (!add.Success)
@@ -64,11 +63,18 @@ public sealed class RepositoryGitSyncService
             if (!remote.Success || string.IsNullOrWhiteSpace(remote.Output))
                 return GitSyncResult.Fail("This repository has no upstream branch or origin remote to push to.");
 
+            if (!committed)
+            {
+                var aheadWithoutUpstream = await RunGitAsync(repositoryPath, "rev-list", "--count", "HEAD");
+                if (!aheadWithoutUpstream.Success)
+                    return GitSyncResult.Fail("Could not inspect local commits before publishing the branch.\n" + aheadWithoutUpstream.Output);
+            }
+
             var publish = await RunGitAsync(repositoryPath, "push", "-u", "origin", "HEAD");
             return publish.Success
-                ? GitSyncResult.Ok(committed
-                    ? "Committed physical C# source and published the branch to GitHub."
-                    : "Published the branch and confirmed GitHub is up to date.")
+                ? GitSyncResult.Ok(BuildSuccessMessage(
+                    committed ? "Committed Code Loom C# source and published the branch to GitHub." : "Published the branch to GitHub.",
+                    unrelated.Count))
                 : GitSyncResult.Fail("Push failed:\n" + publish.Output);
         }
 
@@ -78,34 +84,79 @@ public sealed class RepositoryGitSyncService
             "--left-right",
             "--count",
             $"HEAD...{upstream.Output.Trim()}");
-        var behind = 0;
-        if (counts.Success)
-        {
-            var parts = counts.Output.Split(
-                new[] { ' ', '\t', '\r', '\n' },
-                StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2)
-                _ = int.TryParse(parts[1], out behind);
-        }
+        if (!counts.Success)
+            return GitSyncResult.Fail("Could not compare the local branch with GitHub:\n" + counts.Output);
+
+        ParseAheadBehind(counts.Output, out var ahead, out var behind);
 
         if (behind > 0)
         {
+            if (unrelated.Count > 0)
+            {
+                var shown = string.Join("\n", unrelated.Take(8).Select(path => "• " + path));
+                return GitSyncResult.Fail(
+                    "GitHub has incoming changes, so Code Loom stopped before rebasing while unrelated local files are present. " +
+                    "Nothing needs to be deleted. Use Pull first; Pull temporarily protects local working files and restores them afterward.\n\n" +
+                    $"Unrelated local files left untouched ({unrelated.Count}):\n" + shown);
+            }
+
             var rebase = await RunGitAsync(repositoryPath, "rebase", upstream.Output.Trim());
             if (!rebase.Success)
             {
                 return GitSyncResult.Fail(
                     "Push paused because local and GitHub commits could not be reconciled automatically. " +
-                    "Resolve the Git conflict before pushing again.\n\n" + rebase.Output);
+                    "No unrelated files were deleted. Resolve the Git conflict before pushing again.\n\n" + rebase.Output);
             }
+
+            var refreshedCounts = await RunGitAsync(
+                repositoryPath,
+                "rev-list",
+                "--left-right",
+                "--count",
+                $"HEAD...{upstream.Output.Trim()}");
+            if (refreshedCounts.Success)
+                ParseAheadBehind(refreshedCounts.Output, out ahead, out _);
+        }
+
+        if (ahead <= 0 && !committed)
+        {
+            return GitSyncResult.Ok(BuildSuccessMessage(
+                "Nothing to push — Code Loom source is already up to date with GitHub.",
+                unrelated.Count));
         }
 
         var push = await RunGitAsync(repositoryPath, "push");
         if (!push.Success)
             return GitSyncResult.Fail("Push failed:\n" + push.Output);
 
-        return GitSyncResult.Ok(committed
-            ? "Committed physical C# source, incorporated GitHub updates, and pushed successfully."
-            : "GitHub is up to date.");
+        return GitSyncResult.Ok(BuildSuccessMessage(
+            committed
+                ? "Committed Code Loom C# source and pushed successfully."
+                : "Pushed existing local commits successfully.",
+            unrelated.Count));
+    }
+
+    private static string BuildSuccessMessage(string message, int unrelatedCount)
+    {
+        if (unrelatedCount <= 0)
+            return message;
+
+        return message +
+               $" {unrelatedCount} unrelated local file(s) were left exactly as they were and were not included in the Code Loom commit.";
+    }
+
+    private static void ParseAheadBehind(string output, out int ahead, out int behind)
+    {
+        ahead = 0;
+        behind = 0;
+        var parts = output.Split(
+            new[] { ' ', '\t', '\r', '\n' },
+            StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+            return;
+
+        _ = int.TryParse(parts[0], out ahead);
+        _ = int.TryParse(parts[1], out behind);
     }
 
     private static IEnumerable<string> ParseChangedPaths(string output)
@@ -129,6 +180,7 @@ public sealed class RepositoryGitSyncService
     private static bool IsManagedPath(string normalizedPath)
     {
         return normalizedPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+               || normalizedPath.EndsWith(".cs.meta", StringComparison.OrdinalIgnoreCase)
                || normalizedPath.StartsWith(".codeloom/", StringComparison.OrdinalIgnoreCase)
                || string.Equals(normalizedPath, ".codeloom", StringComparison.OrdinalIgnoreCase)
                || normalizedPath.StartsWith(UnityExportService.GeneratedRelativePath + "/", StringComparison.OrdinalIgnoreCase)
@@ -143,7 +195,7 @@ public sealed class RepositoryGitSyncService
         {
             var startInfo = new ProcessStartInfo
             {
-                FileName = "git",
+                FileName = GitExecutableLocator.Resolve(),
                 WorkingDirectory = workingDirectory,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -167,7 +219,9 @@ public sealed class RepositoryGitSyncService
         }
         catch (Exception exception)
         {
-            return new GitCommandResult(-1, "Could not run Git.\n" + exception.Message);
+            return new GitCommandResult(
+                -1,
+                "Could not run Git using " + GitExecutableLocator.DescribeResolvedPath() + ".\n" + exception.Message);
         }
     }
 
