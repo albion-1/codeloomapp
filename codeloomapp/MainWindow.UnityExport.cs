@@ -17,9 +17,8 @@ public partial class MainWindow
     private bool _unityExportToolbarInstalled;
     private bool _unityExportBusy;
 
-    protected override void OnContentRendered(EventArgs e)
+    private void InitializeUnityExportAndSettingsUi()
     {
-        base.OnContentRendered(e);
         EnsureUnityExportUi();
         InstallUnityExportToolbarButton();
         EnsureSettingsUi();
