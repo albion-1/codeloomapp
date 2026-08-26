@@ -18,10 +18,7 @@
             <Setter Property="Padding" Value="8" />
             <Setter Property="CaretBrush" Value="White" />
         </Style>
-        <Style TargetType="Button">
-            <Setter Property="Foreground" Value="#F4F7FB" />
-            <Setter Property="Background" Value="#181D24" />
-            <Setter Property="BorderBrush" Value="#35404E" />
+        <Style TargetType="Button" BasedOn="{StaticResource CodeLoomButtonStyle}">
             <Setter Property="Padding" Value="12,8" />
             <Setter Property="Margin" Value="0,0,8,0" />
         </Style>
@@ -70,7 +67,12 @@
 
         <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Cancel" Click="Cancel_Click" />
-            <Button Content="Create" Click="Create_Click" Background="#E7EDF7" Foreground="#090B0E" Margin="0" />
+            <Button Content="Create"
+                    Click="Create_Click"
+                    Background="#303841"
+                    Foreground="#F1F4F7"
+                    BorderBrush="#3B4651"
+                    Margin="0" />
         </StackPanel>
     </Grid>
 </Window>
