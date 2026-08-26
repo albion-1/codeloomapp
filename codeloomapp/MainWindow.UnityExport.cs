@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Microsoft.Win32;
 using codeloomapp.Services;
 using codeloomapp.Views;
@@ -13,12 +14,14 @@ public partial class MainWindow
     private readonly UnityExportService _unityExport = new();
     private UnityExportView? _unityExportView;
     private bool _unityExportUiInstalled;
+    private bool _unityExportToolbarInstalled;
     private bool _unityExportBusy;
 
     protected override void OnContentRendered(EventArgs e)
     {
         base.OnContentRendered(e);
         EnsureUnityExportUi();
+        InstallUnityExportToolbarButton();
     }
 
     private void EnsureUnityExportUi()
@@ -49,6 +52,41 @@ public partial class MainWindow
         _unityExportView.OpenFolderRequested += UnityExportView_OpenFolderRequested;
         statusStack.Children.Add(_unityExportView);
         RefreshUnityExportUi();
+    }
+
+    private void InstallUnityExportToolbarButton()
+    {
+        if (_unityExportToolbarInstalled || Content is not Grid root)
+            return;
+
+        var topRow = root.Children
+            .OfType<Grid>()
+            .FirstOrDefault(grid => Grid.GetRow(grid) == 0);
+        var toolbar = topRow?.Children.OfType<WrapPanel>().FirstOrDefault();
+        if (toolbar is null)
+            return;
+
+        if (toolbar.Children
+            .OfType<Button>()
+            .Any(button => string.Equals(
+                button.Content?.ToString(),
+                "Export to Unity",
+                StringComparison.Ordinal)))
+        {
+            _unityExportToolbarInstalled = true;
+            return;
+        }
+
+        var button = new Button
+        {
+            Content = "Export to Unity",
+            Background = new SolidColorBrush(Color.FromRgb(48, 56, 65)),
+            Foreground = new SolidColorBrush(Color.FromRgb(241, 244, 247)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(59, 70, 81))
+        };
+        button.Click += ExportToUnity_Click;
+        toolbar.Children.Add(button);
+        _unityExportToolbarInstalled = true;
     }
 
     private void ExportToUnity_Click(object sender, RoutedEventArgs e)
