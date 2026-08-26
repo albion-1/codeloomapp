@@ -8,7 +8,7 @@ public partial class HistoryView : UserControl
 {
     public event EventHandler? UndoRequested;
     public event EventHandler? RedoRequested;
-    public event EventHandler<ProjectHistoryEntry>? RestoreRequested;
+    public event EventHandler<HistoryRestoreRequestedEventArgs>? RestoreRequested;
 
     public HistoryView()
     {
@@ -54,6 +54,11 @@ public partial class HistoryView : UserControl
     private void RestoreSelected_Click(object sender, RoutedEventArgs e)
     {
         if (HistoryList.SelectedItem is ProjectHistoryEntry entry)
-            RestoreRequested?.Invoke(this, entry);
+            RestoreRequested?.Invoke(this, new HistoryRestoreRequestedEventArgs(entry));
     }
+}
+
+public sealed class HistoryRestoreRequestedEventArgs(ProjectHistoryEntry entry) : EventArgs
+{
+    public ProjectHistoryEntry Entry { get; } = entry;
 }
