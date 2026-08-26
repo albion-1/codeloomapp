@@ -45,11 +45,6 @@ public sealed class ProjectStorageService
         return Path.Combine(repositoryPath, ".codeloom", "project.json");
     }
 
-    public string GetProjectBackupFilePath(string repositoryPath)
-    {
-        return Path.Combine(repositoryPath, ".codeloom", "project.backup.json");
-    }
-
     public string SerializeProject(CodeProject project)
     {
         return JsonSerializer.Serialize(project, JsonOptions);
@@ -58,31 +53,19 @@ public sealed class ProjectStorageService
     public void SaveProject(CodeProject project, string repositoryPath)
     {
         var projectFile = GetProjectFilePath(repositoryPath);
-        var backupFile = GetProjectBackupFilePath(repositoryPath);
         var directory = Path.GetDirectoryName(projectFile)!;
         Directory.CreateDirectory(directory);
-
-        AtomicWrite(projectFile, SerializeProject(project), backupFile);
+        AtomicWrite(projectFile, SerializeProject(project));
     }
 
     public CodeProject? LoadProject(string repositoryPath)
     {
         var projectFile = GetProjectFilePath(repositoryPath);
-        var backupFile = GetProjectBackupFilePath(repositoryPath);
-
         if (!File.Exists(projectFile))
             return null;
 
-        try
-        {
-            return DeserializeProject(File.ReadAllText(projectFile));
-        }
-        catch when (File.Exists(backupFile))
-        {
-            // If a write was interrupted or the main file became malformed,
-            // fall back to the last known-good project copy.
-            return DeserializeProject(File.ReadAllText(backupFile));
-        }
+        var json = File.ReadAllText(projectFile);
+        return JsonSerializer.Deserialize<CodeProject>(json, JsonOptions);
     }
 
     public DateTime? GetProjectLastWriteTimeUtc(string repositoryPath)
@@ -128,12 +111,7 @@ public sealed class ProjectStorageService
         }
     }
 
-    private static CodeProject? DeserializeProject(string json)
-    {
-        return JsonSerializer.Deserialize<CodeProject>(json, JsonOptions);
-    }
-
-    private static void AtomicWrite(string path, string content, string? backupPath = null)
+    private static void AtomicWrite(string path, string content)
     {
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -144,10 +122,6 @@ public sealed class ProjectStorageService
         try
         {
             File.WriteAllText(temporaryPath, content);
-
-            if (backupPath is not null && File.Exists(path))
-                File.Copy(path, backupPath, overwrite: true);
-
             File.Move(temporaryPath, path, overwrite: true);
         }
         finally
