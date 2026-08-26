@@ -41,16 +41,30 @@ public partial class GitStatusView : UserControl
             ? status.ConflictCount == 1 ? "1 conflict" : $"{status.ConflictCount} conflicts"
             : status.Changes.Count == 0
                 ? "Clean"
-                : status.Changes.Count == 1
-                    ? "1 changed file"
-                    : $"{status.Changes.Count} changed files";
+                : status.OtherChangeCount > 0
+                    ? $"{status.Changes.Count} changed · {status.OtherChangeCount} other"
+                    : status.Changes.Count == 1
+                        ? "1 Code Loom change"
+                        : $"{status.Changes.Count} Code Loom changes";
 
         RemoteText.Text = string.IsNullOrWhiteSpace(status.RemoteUrl)
             ? "origin: not configured"
             : "origin: " + status.RemoteUrl;
 
-        WarningText.Text = status.WarningMessage;
-        WarningText.Visibility = string.IsNullOrWhiteSpace(status.WarningMessage)
+        var warnings = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status.WarningMessage))
+            warnings.Add(status.WarningMessage);
+
+        if (status.OtherChangeCount > 0)
+        {
+            warnings.Add(
+                status.OtherChangeCount == 1
+                    ? "1 local change is outside Code Loom metadata. Sync will leave it untouched and wait for you to handle it first."
+                    : $"{status.OtherChangeCount} local changes are outside Code Loom metadata. Sync will leave them untouched and wait for you to handle them first.");
+        }
+
+        WarningText.Text = string.Join(Environment.NewLine, warnings);
+        WarningText.Visibility = warnings.Count == 0
             ? Visibility.Collapsed
             : Visibility.Visible;
 
