@@ -5,10 +5,6 @@ namespace codeloomapp.Services;
 
 public static class VariableSyncService
 {
-    private static readonly Regex IdentifierRegex = new(
-        @"^[A-Za-z_][A-Za-z0-9_]*$",
-        RegexOptions.Compiled);
-
     private static readonly Regex FieldRegex = new(
         @"^(?<indent>\s*)(?<attributes>(?:\[[^\]\r\n]+\]\s*)*)(?:(?<access>public|private\s+protected|private|protected\s+internal|protected|internal)\s+)?(?<modifiers>(?:(?:static|readonly|const|volatile|new|unsafe|required|fixed)\s+)*)?(?<type>[A-Za-z_][A-Za-z0-9_:.?<>,\[\]\s]*?)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:=\s*(?<default>.*?))?;\s*(?<comment>//.*)?$",
         RegexOptions.Compiled);
@@ -98,9 +94,9 @@ public static class VariableSyncService
         newType = newType.Trim();
         newDefaultValue = newDefaultValue.Trim();
 
-        if (!IdentifierRegex.IsMatch(newName))
+        if (!NameSafetyService.IsValidCSharpIdentifier(newName))
         {
-            error = "Variable names must be valid C# identifiers and cannot contain spaces.";
+            error = "Variable names must be valid C# identifiers and cannot be C# keywords such as class, int, or namespace.";
             return false;
         }
 
@@ -315,8 +311,12 @@ public static class VariableSyncService
         if (string.IsNullOrWhiteSpace(type)
             || string.Equals(type, "var", StringComparison.Ordinal)
             || type.Contains('(')
-            || type.Contains(')'))
+            || type.Contains(')')
+            || HasTopLevelComma(type))
         {
+            // A declaration such as `private int x, y;` is deliberately ignored.
+            // Treating only the last name as a field would make the Variables view lie
+            // about the actual declaration. Users can split it into one field per line.
             return false;
         }
 
@@ -377,6 +377,35 @@ public static class VariableSyncService
         }
 
         return baseName + suffix;
+    }
+
+    private static bool HasTopLevelComma(string value)
+    {
+        var angleDepth = 0;
+        var bracketDepth = 0;
+
+        foreach (var character in value)
+        {
+            switch (character)
+            {
+                case '<':
+                    angleDepth++;
+                    break;
+                case '>':
+                    angleDepth = Math.Max(0, angleDepth - 1);
+                    break;
+                case '[':
+                    bracketDepth++;
+                    break;
+                case ']':
+                    bracketDepth = Math.Max(0, bracketDepth - 1);
+                    break;
+                case ',' when angleDepth == 0 && bracketDepth == 0:
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static string NormalizeSpacing(string value)
