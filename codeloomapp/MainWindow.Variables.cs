@@ -17,6 +17,7 @@ public partial class MainWindow
         FileList.SelectionChanged -= FileList_VariableSyncSelectionChanged;
         FileList.SelectionChanged += FileList_VariableSyncSelectionChanged;
         SyncActiveFileVariables();
+        InitializeSmartAssemblyUi();
         InitializeUnityExportAndSettingsUi();
     }
 
