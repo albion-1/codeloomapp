@@ -8,9 +8,9 @@ public partial class MainWindow
 {
     private bool _startupStateFinalized;
 
-    protected override void OnContentRendered(EventArgs e)
+    protected override void OnSourceInitialized(EventArgs e)
     {
-        base.OnContentRendered(e);
+        base.OnSourceInitialized(e);
 
         if (_startupStateFinalized)
             return;
