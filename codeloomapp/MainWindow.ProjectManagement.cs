@@ -2,6 +2,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using codeloomapp.Models;
+using codeloomapp.Services;
 
 namespace codeloomapp;
 
@@ -231,6 +232,17 @@ public partial class MainWindow
             ? dialog.Value
             : dialog.Value + ".cs";
 
+        if (!NameSafetyService.IsValidWindowsFileName(newName))
+        {
+            MessageBox.Show(
+                this,
+                "Use a normal Windows file name without slashes, reserved device names, or a trailing dot/space.",
+                "Invalid C# file name",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
         if (folder.Files.Any(candidate => !ReferenceEquals(candidate, file) && string.Equals(candidate.Name, newName, StringComparison.OrdinalIgnoreCase)))
         {
             MessageBox.Show(this, "That folder already contains a file with this name.", "Code Loom", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -239,10 +251,28 @@ public partial class MainWindow
 
         file.Name = newName;
 
-        var oldStem = System.IO.Path.GetFileNameWithoutExtension(oldFileName);
-        var newStem = System.IO.Path.GetFileNameWithoutExtension(newName);
+        var oldStem = Path.GetFileNameWithoutExtension(oldFileName);
+        var newStem = Path.GetFileNameWithoutExtension(newName);
         if (string.Equals(oldClassName, oldStem, StringComparison.Ordinal))
-            file.ClassName = MakeSafeClassName(newStem);
+        {
+            var newClassName = NameSafetyService.MakeSafeCSharpIdentifier(newStem);
+            file.ClassName = newClassName;
+
+            // Keep the conventional ClassName.Part subfile labels in sync while
+            // preserving any custom labels that the user deliberately chose.
+            var oldPrefix = oldClassName + ".";
+            foreach (var subfile in file.Subfiles)
+            {
+                if (subfile.Name.StartsWith(oldPrefix, StringComparison.Ordinal))
+                    subfile.Name = newClassName + subfile.Name[oldClassName.Length..];
+            }
+
+            foreach (var variable in file.Variables)
+            {
+                if (variable.DeclaredIn.StartsWith(oldPrefix, StringComparison.Ordinal))
+                    variable.DeclaredIn = newClassName + variable.DeclaredIn[oldClassName.Length..];
+            }
+        }
 
         RefreshFileList();
         RefreshProjectTree();
@@ -372,13 +402,6 @@ public partial class MainWindow
 
     private static string MakeSafeClassName(string value)
     {
-        var cleaned = new string(value.Where(character => char.IsLetterOrDigit(character) || character == '_').ToArray());
-        if (string.IsNullOrWhiteSpace(cleaned))
-            return "NewScript";
-
-        if (!char.IsLetter(cleaned[0]) && cleaned[0] != '_')
-            cleaned = "_" + cleaned;
-
-        return cleaned;
+        return NameSafetyService.MakeSafeCSharpIdentifier(value);
     }
 }
