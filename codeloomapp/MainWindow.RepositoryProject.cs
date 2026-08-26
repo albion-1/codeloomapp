@@ -1,5 +1,6 @@
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using codeloomapp.Models;
 using codeloomapp.Services;
 
@@ -8,6 +9,128 @@ namespace codeloomapp;
 public partial class MainWindow
 {
     private readonly RepositoryProjectService _repositoryProject = new();
+    private bool _repositoryBackedProjectUiInstalled;
+
+    private void EnsureRepositoryBackedProjectUi()
+    {
+        if (_repositoryBackedProjectUiInstalled || Content is not Grid root)
+            return;
+
+        var topRow = root.Children
+            .OfType<Grid>()
+            .FirstOrDefault(grid => Grid.GetRow(grid) == 0);
+        var toolbar = topRow?.Children.OfType<WrapPanel>().FirstOrDefault();
+        if (toolbar is null)
+            return;
+
+        RewireToolbarButton(toolbar, "Choose Existing Repo", ChooseRepositoryBacked_Click);
+        RewireToolbarButton(toolbar, "Save", SaveRepositoryBacked_Click);
+        RewireToolbarButton(toolbar, "Load", LoadRepositoryBacked_Click);
+
+        FileList.SelectionChanged += (_, _) =>
+        {
+            if (_activeFile is null)
+                return;
+
+            ActiveFileText.Text = !string.IsNullOrWhiteSpace(_activeFile.RepositoryRelativePath)
+                ? _activeFile.RepositoryRelativePath
+                : _activeFile.IsLegacyUnmapped
+                    ? _activeFile.Name + " · legacy/unmapped"
+                    : _activeFile.Name;
+        };
+
+        _repositoryBackedProjectUiInstalled = true;
+    }
+
+    private void RewireToolbarButton(WrapPanel toolbar, string content, RoutedEventHandler handler)
+    {
+        var button = toolbar.Children
+            .OfType<Button>()
+            .FirstOrDefault(candidate => string.Equals(candidate.Content?.ToString(), content, StringComparison.Ordinal));
+        if (button is null)
+            return;
+
+        if (content == "Choose Existing Repo")
+            button.Click -= ChooseRepository_Click;
+        else if (content == "Save")
+            button.Click -= SaveProject_Click;
+        else if (content == "Load")
+            button.Click -= LoadProject_Click;
+
+        button.Click += handler;
+    }
+
+    private void ChooseRepositoryBacked_Click(object sender, RoutedEventArgs e)
+    {
+        if (!SelectRepository())
+            return;
+
+        try
+        {
+            var loaded = LoadRepositoryProjectFromDisk(
+                showChangeSummary: false,
+                status: "Repository selected · physical C# files loaded");
+            StatusText.Text = loaded.Project.Folders.SelectMany(folder => folder.Files).Any()
+                ? $"Repository selected · loaded {loaded.Scan.Files.Count} physical C# file(s)"
+                : "Repository selected · no eligible C# files found";
+        }
+        catch (Exception exception)
+        {
+            SetBlankProjectState("Repository selected, but C# source could not be loaded");
+            MessageBox.Show(
+                this,
+                "Code Loom selected the repository but could not load its C# files.\n\n" + exception.Message,
+                "Repository load failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void SaveRepositoryBacked_Click(object sender, RoutedEventArgs e)
+    {
+        SaveEditorToActiveSubfile();
+        CommitVariableEdits();
+        TrySaveRepositoryProject(showConfirmation: true);
+    }
+
+    private void LoadRepositoryBacked_Click(object sender, RoutedEventArgs e)
+    {
+        if (!HasRepository())
+        {
+            ChooseRepositoryBacked_Click(sender, e);
+            return;
+        }
+
+        SaveEditorToActiveSubfile();
+        CommitVariableEdits();
+        var dirty = _repositoryProject.GetLocallyModifiedSourcePaths(_project);
+        if (dirty.Count > 0)
+        {
+            var shown = string.Join("\n", dirty.Take(8).Select(path => "• " + path));
+            var answer = MessageBox.Show(
+                this,
+                "Reload physical C# files from the repository?\n\nThese Code Loom edits have not been written to their .cs files and would be discarded:\n\n" + shown,
+                "Reload repository source",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (answer != MessageBoxResult.Yes)
+                return;
+        }
+
+        try
+        {
+            LoadRepositoryProjectFromDisk(showChangeSummary: true, status: "Reloaded physical repository C# files");
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                this,
+                "Code Loom could not reload the repository C# files.\n\n" + exception.Message,
+                "Repository load failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
 
     private RepositoryProjectLoadResult LoadRepositoryProjectFromDisk(
         bool showChangeSummary,
