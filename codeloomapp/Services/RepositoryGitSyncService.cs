@@ -6,6 +6,13 @@ public sealed class RepositoryGitSyncService
 {
     public async Task<GitSyncResult> SyncAsync(string repositoryPath)
     {
+        // A 0.1.7 Pull could leave only .codeloom/project.json in an unresolved
+        // stash-pop conflict. That file is generated metadata, not source. Repair that
+        // exact Code Loom-owned state before Push; real source conflicts still stop.
+        var repair = await RepositoryGitPullService.RepairCodeLoomMetadataConflictAsync(repositoryPath);
+        if (!repair.Success)
+            return repair;
+
         var status = await RunGitAsync(repositoryPath, "status", "--porcelain=v1", "--untracked-files=all");
         if (!status.Success)
             return GitSyncResult.Fail("Could not inspect Git status:\n" + status.Output);
@@ -179,6 +186,9 @@ public sealed class RepositoryGitSyncService
 
     private static bool IsManagedPath(string normalizedPath)
     {
+        if (IsLocalOnlyCodeLoomBackup(normalizedPath))
+            return false;
+
         return normalizedPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
                || normalizedPath.EndsWith(".cs.meta", StringComparison.OrdinalIgnoreCase)
                || normalizedPath.StartsWith(".codeloom/", StringComparison.OrdinalIgnoreCase)
@@ -187,6 +197,17 @@ public sealed class RepositoryGitSyncService
                || string.Equals(normalizedPath, UnityExportService.GeneratedRelativePath, StringComparison.OrdinalIgnoreCase)
                || string.Equals(normalizedPath, UnityExportService.GeneratedRelativePath + ".meta", StringComparison.OrdinalIgnoreCase)
                || string.Equals(normalizedPath, "Assets/CodeLoom.meta", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsLocalOnlyCodeLoomBackup(string normalizedPath)
+    {
+        return string.Equals(
+                   normalizedPath,
+                   ".codeloom/project.legacy-backup.json",
+                   StringComparison.OrdinalIgnoreCase)
+               || normalizedPath.StartsWith(
+                   ".codeloom/project.pull-safety-backup",
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<GitCommandResult> RunGitAsync(string workingDirectory, params string[] arguments)
