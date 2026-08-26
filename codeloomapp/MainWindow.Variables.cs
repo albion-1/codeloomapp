@@ -20,6 +20,7 @@ public partial class MainWindow
         InitializeSmartAssemblyUi();
         InitializeUnityExportAndSettingsUi();
         InitializeVisualPolish();
+        EnsureRepositoryScannerUi();
     }
 
     private void FileList_VariableSyncSelectionChanged(object sender, SelectionChangedEventArgs e)
