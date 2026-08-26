@@ -48,6 +48,7 @@ public partial class MainWindow
         var stack = new StackPanel();
         stack.Children.Add(existingStatusGrid);
         stack.Children.Add(_gitStatusView);
+        InstallSecondaryToolsUi(stack);
         statusBorder.Child = stack;
 
         _gitStatusTimer.Tick += GitStatusTimer_Tick;
@@ -232,6 +233,8 @@ public partial class MainWindow
             _project = project;
             RefreshEntireProjectUi();
             RefreshProjectTree();
+            CaptureImmediateHistory("Applied remote GitHub changes");
+            _lastAutosavedFingerprint = _storage.SerializeProject(_project);
             SaveStateText.Text = "Git updated";
         }
         catch
