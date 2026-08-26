@@ -1,4 +1,3 @@
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using codeloomapp.Services;
@@ -60,6 +59,9 @@ public partial class MainWindow
 
         try
         {
+            SaveEditorToActiveSubfile();
+            CommitVariableEdits();
+
             var repositoryRoot = Path.GetFullPath(_settings.GitRepositoryPath);
             if (!string.Equals(_repositoryCSharpSnapshotRoot, repositoryRoot, StringComparison.OrdinalIgnoreCase))
             {
@@ -83,7 +85,7 @@ public partial class MainWindow
             var summary = BuildRepositoryChangeSummary(result, Array.Empty<string>());
             var answer = MessageBox.Show(
                 this,
-                summary + "\n\nRefresh Code Loom from these physical .cs files now?\n\nCode Loom will preserve external edits and will not overwrite a file that was changed both inside and outside the app.",
+                summary + "\n\nRefresh Code Loom from these physical .cs files now?\n\nExternal source is never silently overwritten.",
                 "C# repository changes found",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -93,12 +95,35 @@ public partial class MainWindow
                 return;
             }
 
-            // Save independent Code Loom edits first. The repository writer only blocks
-            // when the same physical file was edited on both sides.
-            SaveEditorToActiveSubfile();
-            CommitVariableEdits();
-            if (!TrySaveRepositoryProject(showConfirmation: false))
-                return;
+            var localEdits = _repositoryProject.GetLocallyModifiedSourcePaths(_project);
+            if (localEdits.Count > 0)
+            {
+                var externallyChanged = result.Changes
+                    .Where(change => change.Kind is RepositoryCSharpChangeKind.Changed or RepositoryCSharpChangeKind.Removed)
+                    .Select(change => change.RelativePath)
+                    .Concat(result.Changes
+                        .Where(change => change.Kind == RepositoryCSharpChangeKind.Renamed)
+                        .Select(change => change.PreviousRelativePath))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var overlap = localEdits.Where(externallyChanged.Contains).ToList();
+
+                if (overlap.Count > 0)
+                {
+                    MessageBox.Show(
+                        this,
+                        "The same C# file changed both inside Code Loom and on disk. Code Loom will not choose one version automatically.\n\n" +
+                        string.Join("\n", overlap.Take(8).Select(path => "• " + path)) +
+                        "\n\nResolve or save that file intentionally before refreshing.",
+                        "C# edit conflict",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    StatusText.Text = "C# refresh paused · overlapping edits need review";
+                    return;
+                }
+
+                if (!TrySaveRepositoryProject(showConfirmation: false))
+                    return;
+            }
 
             LoadRepositoryProjectFromDisk(
                 showChangeSummary: true,
