@@ -36,7 +36,7 @@ public partial class MainWindow
         var pullButton = new Button
         {
             Content = "Pull",
-            ToolTip = "Get incoming GitHub changes, then rescan physical repository C# files."
+            ToolTip = "Get incoming GitHub changes, safely protect local working files, then rescan physical repository C# files."
         };
         pullButton.Click += PullGitHub_Click;
 
@@ -63,6 +63,9 @@ public partial class MainWindow
 
         try
         {
+            // Persist any editor change first. RepositoryGitPullService then protects
+            // every uncommitted working-tree change with a temporary Git stash, so
+            // Code Loom's own metadata can never make Pull deadlock itself.
             SaveEditorToActiveSubfile();
             CommitVariableEdits();
             if (!TrySaveRepositoryProject(showConfirmation: false))
@@ -91,7 +94,7 @@ public partial class MainWindow
                 return;
             }
 
-            var result = await _git.ApplyRemoteChangesAsync(_settings.GitRepositoryPath);
+            var result = await new RepositoryGitPullService().PullAsync(_settings.GitRepositoryPath);
             if (!result.Success)
             {
                 ShowGitActionFailure("GitHub pull paused", GitActionFriendlyMessage(result.Message));
