@@ -9,7 +9,8 @@ var tests = new List<(string Name, Action Run)>
     ("Existing C# imports and reassembles", TestImportRoundTrip),
     ("Project JSON round-trips", TestProjectStorageRoundTrip),
     ("Unity export preserves external edits", TestUnityExportConflictProtection),
-    ("Repository C# scanner detects safe changes", RepositoryScannerSmokeTests.Run)
+    ("Repository C# scanner detects safe changes", RepositoryScannerSmokeTests.Run),
+    ("Repository C# files remain independent source of truth", RepositoryProjectSmokeTests.Run)
 };
 
 var failures = new List<string>();
