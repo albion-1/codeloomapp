@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 
 namespace codeloomapp;
 
@@ -28,17 +29,34 @@ public partial class GitHubAuthDialog : Window
     {
         ShowTokenButton.Visibility = Visibility.Collapsed;
         TokenPanel.Visibility = Visibility.Visible;
+        ConnectTokenButton.IsDefault = true;
         TokenBox.Focus();
     }
 
     private void HideToken_Click(object sender, RoutedEventArgs e)
     {
         TokenBox.Clear();
+        ConnectTokenButton.IsDefault = false;
         TokenPanel.Visibility = Visibility.Collapsed;
         ShowTokenButton.Visibility = Visibility.Visible;
+        ShowTokenButton.Focus();
+    }
+
+    private void TokenBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        e.Handled = true;
+        SubmitToken();
     }
 
     private void Token_Click(object sender, RoutedEventArgs e)
+    {
+        SubmitToken();
+    }
+
+    private void SubmitToken()
     {
         if (string.IsNullOrWhiteSpace(TokenBox.Password))
         {
