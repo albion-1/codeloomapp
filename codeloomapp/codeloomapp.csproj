@@ -10,9 +10,9 @@
     <RootNamespace>codeloomapp</RootNamespace>
     <Product>Code Loom</Product>
     <Description>A visual C# coding companion that assembles conceptual subfiles into ordinary Unity scripts.</Description>
-    <Version>0.1.4</Version>
-    <FileVersion>0.1.4.0</FileVersion>
-    <AssemblyVersion>0.1.4.0</AssemblyVersion>
+    <Version>0.1.5</Version>
+    <FileVersion>0.1.5.0</FileVersion>
+    <AssemblyVersion>0.1.5.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
