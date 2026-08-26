@@ -29,6 +29,8 @@ public partial class MainWindow
 
     private void EnsureGitStatusUi()
     {
+        EnsureMainGitActionsUi();
+
         if (_gitStatusUiInstalled)
             return;
 
