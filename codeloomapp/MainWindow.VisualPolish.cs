@@ -19,8 +19,7 @@ public partial class MainWindow
         _visualPolishInitialized = true;
         InstallDarkControlStyles();
         _workspaceGrid = FindWorkspaceGrid();
-        SizeChanged += MainWindow_ResponsiveSizeChanged;
-        UpdateResponsiveWorkspace();
+        ConfigureResponsiveWorkspace();
     }
 
     private void InstallDarkControlStyles()
@@ -176,8 +175,6 @@ public partial class MainWindow
         var expanderStyle = (Style)resources["CodeLoomExpander"];
         var headerStyle = (Style)resources["CodeLoomDataGridHeader"];
 
-        // Replace the implicit styles in MainWindow.xaml so WPF's stock light-theme
-        // templates cannot flash white on hover/selection.
         Resources[typeof(TabItem)] = tabStyle;
         Resources[typeof(Expander)] = expanderStyle;
         Resources[typeof(DataGridColumnHeader)] = headerStyle;
@@ -191,29 +188,48 @@ public partial class MainWindow
         VariablesGrid.ColumnHeaderStyle = headerStyle;
     }
 
-    private void MainWindow_ResponsiveSizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        UpdateResponsiveWorkspace();
-    }
-
-    private void UpdateResponsiveWorkspace()
+    private void ConfigureResponsiveWorkspace()
     {
         if (_workspaceGrid is null || _workspaceGrid.ColumnDefinitions.Count < 3)
             return;
 
-        var width = _workspaceGrid.ActualWidth;
-        if (width <= 0)
-            width = Math.Max(ActualWidth - 28, 1050);
+        // Use WPF's layout engine instead of recalculating fixed pixel widths whenever
+        // the window changes size. The side panels grow proportionally on large screens,
+        // retain useful minimum widths on smaller windows, and stop before they consume
+        // an unreasonable amount of space from the editor.
+        var projectColumn = _workspaceGrid.ColumnDefinitions[0];
+        projectColumn.Width = new GridLength(1.05, GridUnitType.Star);
+        projectColumn.MinWidth = 250;
+        projectColumn.MaxWidth = 360;
 
-        // The original 260/245 layout remains almost unchanged around the normal
-        // window size, but the navigator and subfile panes gain some breathing room
-        // on 1440p/4K full-screen windows instead of leaving all extra width to code.
-        var projectWidth = Math.Clamp(width * 0.19, 250, 340);
-        var subfileWidth = Math.Clamp(width * 0.175, 235, 315);
+        var subfileColumn = _workspaceGrid.ColumnDefinitions[1];
+        subfileColumn.Width = new GridLength(1.0, GridUnitType.Star);
+        subfileColumn.MinWidth = 235;
+        subfileColumn.MaxWidth = 330;
 
-        _workspaceGrid.ColumnDefinitions[0].Width = new GridLength(projectWidth);
-        _workspaceGrid.ColumnDefinitions[1].Width = new GridLength(subfileWidth);
-        _workspaceGrid.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
+        var editorColumn = _workspaceGrid.ColumnDefinitions[2];
+        editorColumn.Width = new GridLength(3.6, GridUnitType.Star);
+        editorColumn.MinWidth = 500;
+
+        _workspaceGrid.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _workspaceGrid.VerticalAlignment = VerticalAlignment.Stretch;
+
+        foreach (var control in new FrameworkElement[]
+                 {
+                     ProjectTree,
+                     SubfileList,
+                     MainTabs,
+                     VariablesGrid,
+                     CodeBox,
+                     AssembledCodeBox,
+                     SubfileNameBox,
+                     RoleBox,
+                     PurposeBox
+                 })
+        {
+            control.HorizontalAlignment = HorizontalAlignment.Stretch;
+            control.VerticalAlignment = VerticalAlignment.Stretch;
+        }
     }
 
     private Grid? FindWorkspaceGrid()
