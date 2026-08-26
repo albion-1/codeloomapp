@@ -6,6 +6,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <AssemblyName>CodeLoom</AssemblyName>
+    <RootNamespace>codeloomapp</RootNamespace>
+    <Product>Code Loom</Product>
+    <Description>A visual C# coding companion that assembles conceptual subfiles into ordinary Unity scripts.</Description>
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
