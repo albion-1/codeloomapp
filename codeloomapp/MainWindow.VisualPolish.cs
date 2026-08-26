@@ -9,7 +9,6 @@ namespace codeloomapp;
 public partial class MainWindow
 {
     private bool _visualPolishInitialized;
-    private Grid? _workspaceGrid;
 
     private void InitializeVisualPolish()
     {
@@ -18,8 +17,6 @@ public partial class MainWindow
 
         _visualPolishInitialized = true;
         InstallDarkControlStyles();
-        _workspaceGrid = FindWorkspaceGrid();
-        ConfigureResponsiveWorkspace();
     }
 
     private void InstallDarkControlStyles()
@@ -186,64 +183,6 @@ public partial class MainWindow
             expander.Style = expanderStyle;
 
         VariablesGrid.ColumnHeaderStyle = headerStyle;
-    }
-
-    private void ConfigureResponsiveWorkspace()
-    {
-        if (_workspaceGrid is null || _workspaceGrid.ColumnDefinitions.Count < 3)
-            return;
-
-        // Use WPF's layout engine instead of recalculating fixed pixel widths whenever
-        // the window changes size. The side panels grow proportionally on large screens,
-        // retain useful minimum widths on smaller windows, and stop before they consume
-        // an unreasonable amount of space from the editor.
-        var projectColumn = _workspaceGrid.ColumnDefinitions[0];
-        projectColumn.Width = new GridLength(1.05, GridUnitType.Star);
-        projectColumn.MinWidth = 250;
-        projectColumn.MaxWidth = 360;
-
-        var subfileColumn = _workspaceGrid.ColumnDefinitions[1];
-        subfileColumn.Width = new GridLength(1.0, GridUnitType.Star);
-        subfileColumn.MinWidth = 235;
-        subfileColumn.MaxWidth = 330;
-
-        var editorColumn = _workspaceGrid.ColumnDefinitions[2];
-        editorColumn.Width = new GridLength(3.6, GridUnitType.Star);
-        editorColumn.MinWidth = 500;
-
-        _workspaceGrid.HorizontalAlignment = HorizontalAlignment.Stretch;
-        _workspaceGrid.VerticalAlignment = VerticalAlignment.Stretch;
-
-        foreach (var control in new FrameworkElement[]
-                 {
-                     ProjectTree,
-                     SubfileList,
-                     MainTabs,
-                     VariablesGrid,
-                     CodeBox,
-                     AssembledCodeBox,
-                     SubfileNameBox,
-                     RoleBox,
-                     PurposeBox
-                 })
-        {
-            control.HorizontalAlignment = HorizontalAlignment.Stretch;
-            control.VerticalAlignment = VerticalAlignment.Stretch;
-        }
-    }
-
-    private Grid? FindWorkspaceGrid()
-    {
-        DependencyObject? current = ProjectTree;
-        while (current is not null)
-        {
-            if (current is Grid grid && grid.ColumnDefinitions.Count == 3)
-                return grid;
-
-            current = VisualTreeHelper.GetParent(current);
-        }
-
-        return null;
     }
 
     private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root)
