@@ -176,8 +176,6 @@ public partial class MainWindow
             }
             finally
             {
-                // The token is never persisted by Code Loom. Drop our temporary
-                // managed reference as soon as the GitHub CLI call has completed.
                 token = string.Empty;
             }
         }
@@ -186,6 +184,26 @@ public partial class MainWindow
             GitHubAccountText.Text = "GitHub: browser sign-in in progress...";
             StatusText.Text = "Complete GitHub verification in the opened sign-in window/browser...";
             result = await _githubCli.SignInAsync();
+
+            if (!result.Success
+                && string.Equals(result.Stage, "Browser sign-in verification", StringComparison.Ordinal))
+            {
+                var retry = MessageBox.Show(
+                    this,
+                    "GitHub accepted the browser/device-code flow, but GitHub CLI did not retain a usable account.\n\n" +
+                    "This can happen when Windows credential storage is unavailable or misbehaving. Code Loom can retry the same browser sign-in using GitHub CLI's local file-based credential storage instead.\n\n" +
+                    "The credential would stay inside your Windows user profile under Code Loom's GitHub CLI folder. It would not be written into your project or Git repository.\n\nRetry with file-based storage?",
+                    "GitHub credential storage fallback",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (retry == MessageBoxResult.Yes)
+                {
+                    GitHubAccountText.Text = "GitHub: retrying browser sign-in...";
+                    StatusText.Text = "Retrying GitHub browser sign-in with local credential storage...";
+                    result = await _githubCli.SignInWithBrowserFileStorageAsync();
+                }
+            }
         }
 
         if (!result.Success)
