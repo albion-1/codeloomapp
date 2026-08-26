@@ -96,6 +96,118 @@
                     </Grid>
                 </Border>
 
+                <Expander x:Name="RemoteUpdatesExpander"
+                          Header="Remote updates"
+                          IsExpanded="False"
+                          Visibility="Collapsed"
+                          Margin="0,9,0,0">
+                    <Border Background="#0F1215"
+                            BorderBrush="#25303A"
+                            BorderThickness="1"
+                            Padding="9"
+                            Margin="0,4,0,0">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock x:Name="RemoteUpdateTitleText"
+                                               Text="Incoming GitHub changes"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="#D8DEE5" />
+                                    <TextBlock x:Name="RemoteUpdateMessageText"
+                                               Text="Remote changes can be reviewed here before they are brought into the local project."
+                                               FontSize="10"
+                                               Foreground="#76818C"
+                                               TextWrapping="Wrap"
+                                               Margin="0,3,12,0" />
+                                </StackPanel>
+                                <Button x:Name="ApplyRemoteUpdatesButton"
+                                        Grid.Column="1"
+                                        Content="Apply Remote Updates"
+                                        Click="ApplyRemoteUpdates_Click"
+                                        Padding="7,3"
+                                        Margin="0"
+                                        VerticalAlignment="Center" />
+                            </Grid>
+
+                            <TextBlock x:Name="RemoteProjectChangedText"
+                                       Text="Code Loom project data changed remotely. Applying updates will reload the project view."
+                                       Visibility="Collapsed"
+                                       Foreground="#AEBEAD"
+                                       FontSize="9"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,0" />
+
+                            <Expander Header="Incoming commits"
+                                      IsExpanded="False"
+                                      Margin="0,8,0,0">
+                                <ItemsControl x:Name="RemoteCommitsItems" Margin="0,4,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="150" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Summary}"
+                                                           FontFamily="Cascadia Mono, Consolas"
+                                                           FontSize="10"
+                                                           Foreground="#C3CBD3"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding AuthorLabel}"
+                                                           FontSize="9"
+                                                           Foreground="#697580"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Margin="8,0,0,0" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Expander>
+
+                            <Expander Header="Files changed remotely"
+                                      IsExpanded="False"
+                                      Margin="0,5,0,0">
+                                <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
+                                    <ItemsControl x:Name="RemoteFilesItems">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="58" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding KindLabel}"
+                                                               FontFamily="Cascadia Mono, Consolas"
+                                                               FontSize="9"
+                                                               Foreground="#82909C" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Path}"
+                                                               FontFamily="Cascadia Mono, Consolas"
+                                                               FontSize="10"
+                                                               Foreground="#BEC5CC"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Expander>
+
+                            <TextBlock Text="This is a fast-forward-only pull. Code Loom will refuse to apply remote changes if you have uncommitted local work or if local and remote history have diverged."
+                                       FontSize="9"
+                                       Foreground="#626D77"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Expander>
+
                 <TextBlock Text="Code Loom only stages .codeloom metadata. Other local repository changes are never silently committed."
                            FontSize="9"
                            Foreground="#626D77"
