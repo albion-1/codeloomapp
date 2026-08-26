@@ -9,6 +9,7 @@ public partial class GitStatusView : UserControl
 {
     public event EventHandler? RefreshRequested;
     public event EventHandler? ContinueRebaseRequested;
+    public event EventHandler? ApplyRemoteUpdatesRequested;
 
     public GitStatusView()
     {
@@ -97,6 +98,47 @@ public partial class GitStatusView : UserControl
             DetailsExpander.IsExpanded = true;
     }
 
+    public void LoadRemotePreview(GitRemoteChangePreview preview, GitRepositoryStatus status)
+    {
+        if (!preview.Available || !preview.HasIncomingChanges)
+        {
+            RemoteUpdatesExpander.Visibility = Visibility.Collapsed;
+            RemoteCommitsItems.ItemsSource = null;
+            RemoteFilesItems.ItemsSource = null;
+            RemoteProjectChangedText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        RemoteUpdatesExpander.Visibility = Visibility.Visible;
+        RemoteUpdatesExpander.Header = preview.Behind == 1
+            ? "Remote updates · 1 incoming commit"
+            : $"Remote updates · {preview.Behind} incoming commits";
+
+        RemoteUpdateTitleText.Text = preview.Behind == 1
+            ? "1 incoming GitHub commit"
+            : $"{preview.Behind} incoming GitHub commits";
+        RemoteUpdateMessageText.Text = preview.Message;
+        RemoteCommitsItems.ItemsSource = preview.Commits;
+        RemoteFilesItems.ItemsSource = preview.Files;
+
+        RemoteProjectChangedText.Visibility = preview.ProjectDataChanged
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        ApplyRemoteUpdatesButton.IsEnabled = preview.CanFastForward
+                                             && status.Changes.Count == 0
+                                             && !status.OperationInProgress
+                                             && status.ConflictCount == 0;
+
+        ApplyRemoteUpdatesButton.ToolTip = ApplyRemoteUpdatesButton.IsEnabled
+            ? "Bring these remote commits into the local repository without creating a merge commit."
+            : preview.Ahead > 0
+                ? "Local and remote history have both moved. Use Sync instead."
+                : status.Changes.Count > 0
+                    ? "Handle or sync local changes before applying remote updates."
+                    : "Remote updates cannot be applied safely yet.";
+    }
+
     public void LoadUnavailable(string message)
     {
         SummaryText.Text = "Git: unavailable";
@@ -108,6 +150,7 @@ public partial class GitStatusView : UserControl
         RemoteText.Text = "origin: —";
         ChangesItems.ItemsSource = null;
         ConflictPanel.Visibility = Visibility.Collapsed;
+        RemoteUpdatesExpander.Visibility = Visibility.Collapsed;
         WarningText.Text = message;
         WarningText.Visibility = Visibility.Visible;
     }
@@ -120,5 +163,10 @@ public partial class GitStatusView : UserControl
     private void ContinueRebase_Click(object sender, RoutedEventArgs e)
     {
         ContinueRebaseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplyRemoteUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyRemoteUpdatesRequested?.Invoke(this, EventArgs.Empty);
     }
 }
