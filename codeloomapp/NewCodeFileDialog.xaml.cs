@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using codeloomapp.Services;
 
 namespace codeloomapp;
 
@@ -35,7 +36,7 @@ public partial class NewCodeFileDialog : Window
 
         var proposed = Path.GetFileNameWithoutExtension(FileNameBox.Text.Trim());
         if (!string.IsNullOrWhiteSpace(proposed))
-            ClassNameBox.Text = MakeIdentifier(proposed);
+            ClassNameBox.Text = NameSafetyService.MakeSafeCSharpIdentifier(proposed);
     }
 
     private void Create_Click(object sender, RoutedEventArgs e)
@@ -52,9 +53,25 @@ public partial class NewCodeFileDialog : Window
             return;
         }
 
-        if (!IsValidIdentifier(ClassName))
+        if (!NameSafetyService.IsValidWindowsFileName(FileName))
         {
-            MessageBox.Show(this, "The class name must be a valid C# identifier.", "Code Loom", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                this,
+                "Use a normal Windows file name without slashes, reserved device names, or a trailing dot/space.",
+                "Invalid C# file name",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!NameSafetyService.IsValidCSharpIdentifier(ClassName))
+        {
+            MessageBox.Show(
+                this,
+                "The class name must be a valid C# identifier and cannot be a C# keyword such as class, int, or namespace.",
+                "Invalid class name",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
@@ -64,28 +81,5 @@ public partial class NewCodeFileDialog : Window
     private static string EnsureCsExtension(string value)
     {
         return value.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ? value : value + ".cs";
-    }
-
-    private static string MakeIdentifier(string value)
-    {
-        var cleaned = new string(value.Where(char.IsLetterOrDigit).ToArray());
-        if (string.IsNullOrWhiteSpace(cleaned))
-            return "NewScript";
-
-        if (!char.IsLetter(cleaned[0]) && cleaned[0] != '_')
-            cleaned = "_" + cleaned;
-
-        return cleaned;
-    }
-
-    private static bool IsValidIdentifier(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return false;
-
-        if (!char.IsLetter(value[0]) && value[0] != '_')
-            return false;
-
-        return value.Skip(1).All(character => char.IsLetterOrDigit(character) || character == '_');
     }
 }
