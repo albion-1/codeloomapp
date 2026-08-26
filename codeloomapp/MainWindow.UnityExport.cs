@@ -22,6 +22,8 @@ public partial class MainWindow
         base.OnContentRendered(e);
         EnsureUnityExportUi();
         InstallUnityExportToolbarButton();
+        EnsureSettingsUi();
+        ApplyWorkstationSettings();
 
         // If startup ordering caused the Git/status stack to be installed a moment
         // later, a future activation gets another harmless chance to attach the
@@ -30,6 +32,7 @@ public partial class MainWindow
         {
             EnsureUnityExportUi();
             RefreshUnityExportUi();
+            EnsureSettingsUi();
         };
     }
 
