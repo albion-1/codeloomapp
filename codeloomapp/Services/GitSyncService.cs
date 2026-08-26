@@ -94,6 +94,139 @@ public sealed class GitSyncService
             warning);
     }
 
+    public async Task<GitRemoteChangePreview> GetRemoteChangePreviewAsync(
+        string repositoryPath,
+        bool fetchRemote = false)
+    {
+        var status = await GetStatusAsync(repositoryPath, fetchRemote);
+        if (!status.Available)
+            return GitRemoteChangePreview.Unavailable(status.WarningMessage);
+
+        if (string.IsNullOrWhiteSpace(status.Upstream))
+        {
+            return new GitRemoteChangePreview(
+                true,
+                status.Upstream,
+                status.Ahead,
+                status.Behind,
+                Array.Empty<GitRemoteCommit>(),
+                Array.Empty<GitRemoteChangedFile>(),
+                "No upstream branch is configured.");
+        }
+
+        if (status.Behind <= 0)
+        {
+            return new GitRemoteChangePreview(
+                true,
+                status.Upstream,
+                status.Ahead,
+                status.Behind,
+                Array.Empty<GitRemoteCommit>(),
+                Array.Empty<GitRemoteChangedFile>(),
+                status.Ahead > 0
+                    ? "No incoming GitHub changes. Local commits have not all been pushed yet."
+                    : "No incoming GitHub changes.");
+        }
+
+        var log = await RunGitAsync(
+            repositoryPath,
+            "log",
+            "--format=%h%x09%an%x09%s",
+            $"HEAD..{status.Upstream}");
+
+        var commits = log.Success
+            ? log.Output
+                .Replace("\r\n", "\n")
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(ParseRemoteCommit)
+                .Where(commit => commit is not null)
+                .Cast<GitRemoteCommit>()
+                .ToList()
+            : new List<GitRemoteCommit>();
+
+        var diff = await RunGitAsync(
+            repositoryPath,
+            "diff",
+            "--name-status",
+            $"HEAD..{status.Upstream}");
+
+        var files = diff.Success
+            ? diff.Output
+                .Replace("\r\n", "\n")
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(ParseRemoteChangedFile)
+                .Where(file => file is not null)
+                .Cast<GitRemoteChangedFile>()
+                .ToList()
+            : new List<GitRemoteChangedFile>();
+
+        var message = status.Ahead > 0
+            ? "Incoming commits exist, but this branch also has local commits. Review them before syncing."
+            : status.Behind == 1
+                ? "1 incoming GitHub commit is ready to review."
+                : $"{status.Behind} incoming GitHub commits are ready to review.";
+
+        return new GitRemoteChangePreview(
+            true,
+            status.Upstream,
+            status.Ahead,
+            status.Behind,
+            commits,
+            files,
+            message);
+    }
+
+    public async Task<GitSyncResult> ApplyRemoteChangesAsync(string repositoryPath)
+    {
+        if (!IsGitRepository(repositoryPath))
+            return GitSyncResult.Fail("The selected folder is not a Git repository.");
+
+        var status = await GetStatusAsync(repositoryPath, fetchRemote: true);
+        if (!status.Available)
+            return GitSyncResult.Fail(status.WarningMessage);
+
+        if (status.OperationInProgress || status.ConflictCount > 0)
+            return GitSyncResult.Fail("Finish the current Git operation or conflict before applying remote changes.");
+
+        if (status.Changes.Count > 0)
+        {
+            return GitSyncResult.Fail(
+                "Remote changes were not applied because this repository has local uncommitted changes. " +
+                "Save/sync your Code Loom work or handle the other local files first, then try again.");
+        }
+
+        if (string.Equals(status.Branch, "detached HEAD", StringComparison.OrdinalIgnoreCase))
+            return GitSyncResult.Fail("Check out a branch before applying remote changes.");
+
+        if (string.IsNullOrWhiteSpace(status.Upstream))
+            return GitSyncResult.Fail("This branch has no upstream branch to receive remote changes from.");
+
+        if (status.Behind <= 0)
+            return GitSyncResult.Ok("There are no new remote changes to apply.");
+
+        if (status.Ahead > 0)
+        {
+            return GitSyncResult.Fail(
+                "The local and remote branches have both moved. Use Sync so Code Loom can reconcile them safely instead of silently rewriting local commits.");
+        }
+
+        // The remote-change workflow is intentionally fast-forward only. This makes
+        // remote edits from ChatGPT, GitHub, or another computer easy to bring down
+        // without creating a merge commit or rewriting local history.
+        var fastForward = await RunGitAsync(repositoryPath, "merge", "--ff-only", status.Upstream);
+        if (!fastForward.Success)
+        {
+            return GitSyncResult.Fail(
+                "Could not apply the remote changes as a safe fast-forward. Nothing was pushed.\n" +
+                fastForward.Output);
+        }
+
+        return GitSyncResult.Ok(
+            status.Behind == 1
+                ? "Applied 1 remote GitHub commit."
+                : $"Applied {status.Behind} remote GitHub commits.");
+    }
+
     public async Task<GitSyncResult> SyncAsync(string repositoryPath)
     {
         if (!IsGitRepository(repositoryPath))
@@ -281,6 +414,32 @@ public sealed class GitSyncService
         return new GitChangedFile(status, path, isCodeLoom, isConflict);
     }
 
+    private static GitRemoteCommit? ParseRemoteCommit(string line)
+    {
+        var parts = line.Split('\t', 3);
+        if (parts.Length < 3)
+            return null;
+
+        return new GitRemoteCommit(parts[0].Trim(), parts[1].Trim(), parts[2].Trim());
+    }
+
+    private static GitRemoteChangedFile? ParseRemoteChangedFile(string line)
+    {
+        var parts = line.Split('\t', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+            return null;
+
+        var status = parts[0].Trim();
+        var path = parts[^1].Trim().Trim('"');
+        var normalized = path.Replace('\\', '/').TrimStart('/');
+        var isCodeLoomProject = string.Equals(
+            normalized,
+            ".codeloom/project.json",
+            StringComparison.OrdinalIgnoreCase);
+
+        return new GitRemoteChangedFile(status, path, isCodeLoomProject);
+    }
+
     private static async Task<GitCommandResult> RunGitAsync(string workingDirectory, params string[] arguments)
     {
         try
@@ -328,6 +487,43 @@ public sealed class GitSyncService
 }
 
 public sealed record GitChangedFile(string Status, string Path, bool IsCodeLoom, bool IsConflict);
+
+public sealed record GitRemoteCommit(string ShortSha, string Author, string Subject)
+{
+    public string Summary => $"{ShortSha} · {Subject}";
+    public string AuthorLabel => string.IsNullOrWhiteSpace(Author) ? "Unknown author" : Author;
+}
+
+public sealed record GitRemoteChangedFile(string Status, string Path, bool IsCodeLoomProject)
+{
+    public string KindLabel => IsCodeLoomProject ? "PROJECT" : Status;
+}
+
+public sealed record GitRemoteChangePreview(
+    bool Available,
+    string Upstream,
+    int Ahead,
+    int Behind,
+    IReadOnlyList<GitRemoteCommit> Commits,
+    IReadOnlyList<GitRemoteChangedFile> Files,
+    string Message)
+{
+    public bool HasIncomingChanges => Available && Behind > 0;
+    public bool CanFastForward => HasIncomingChanges && Ahead == 0;
+    public bool ProjectDataChanged => Files.Any(file => file.IsCodeLoomProject);
+
+    public static GitRemoteChangePreview Unavailable(string message)
+    {
+        return new GitRemoteChangePreview(
+            false,
+            string.Empty,
+            0,
+            0,
+            Array.Empty<GitRemoteCommit>(),
+            Array.Empty<GitRemoteChangedFile>(),
+            message);
+    }
+}
 
 public sealed record GitRepositoryStatus(
     bool Available,
