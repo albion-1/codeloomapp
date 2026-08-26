@@ -4,6 +4,48 @@
              xmlns:local="clr-namespace:codeloomapp"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <Style x:Key="CodeLoomButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#E8ECF1" />
+            <Setter Property="Background" Value="#161A1F" />
+            <Setter Property="BorderBrush" Value="#2A3139" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#20262C" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#3A444E" />
+                                <Setter Property="Foreground" Value="#F1F4F7" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#232A31" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#3E4852" />
+                                <Setter Property="Foreground" Value="#F1F4F7" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#2C353E" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#4A5561" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Application.Resources>
 </Application>
