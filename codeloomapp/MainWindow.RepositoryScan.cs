@@ -14,6 +14,7 @@ public partial class MainWindow
     private void EnsureRepositoryScannerUi()
     {
         EnsureRepositoryBackedProjectUi();
+        EnsureRepositoryFileActionsUi();
 
         if (_repositoryScannerUiInstalled || Content is not Grid root)
             return;
