@@ -67,6 +67,8 @@ public sealed class ProjectStorageService
 
     public RepositoryMetadataLoadResult LoadRepositoryMetadata(string repositoryPath)
     {
+        EnsureLocalOnlyMetadataIgnored(repositoryPath);
+
         var projectFile = GetProjectFilePath(repositoryPath);
         if (!File.Exists(projectFile))
             return new RepositoryMetadataLoadResult();
@@ -91,6 +93,8 @@ public sealed class ProjectStorageService
 
     public void SaveRepositoryMetadata(CodeProject project, string repositoryPath)
     {
+        EnsureLocalOnlyMetadataIgnored(repositoryPath);
+
         var projectFile = GetProjectFilePath(repositoryPath);
         BackupLegacyProjectIfNeeded(repositoryPath);
 
@@ -220,6 +224,49 @@ public sealed class ProjectStorageService
             throw new IOException(
                 "Code Loom found an older project.json but could not create its migration backup. " +
                 "The existing project was left untouched.");
+        }
+    }
+
+    private static void EnsureLocalOnlyMetadataIgnored(string repositoryPath)
+    {
+        try
+        {
+            var gitDirectory = Path.Combine(repositoryPath, ".git");
+            if (!Directory.Exists(gitDirectory))
+                return;
+
+            var infoDirectory = Path.Combine(gitDirectory, "info");
+            Directory.CreateDirectory(infoDirectory);
+            var excludePath = Path.Combine(infoDirectory, "exclude");
+            var existing = File.Exists(excludePath)
+                ? File.ReadAllText(excludePath)
+                : string.Empty;
+
+            var patterns = new[]
+            {
+                ".codeloom/project.legacy-backup.json",
+                ".codeloom/project.pull-safety-backup*.json"
+            };
+
+            var additions = patterns
+                .Where(pattern => !existing
+                    .Replace("\r\n", "\n")
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Any(line => string.Equals(line.Trim(), pattern, StringComparison.Ordinal)))
+                .ToList();
+            if (additions.Count == 0)
+                return;
+
+            using var writer = new StreamWriter(excludePath, append: true);
+            if (!string.IsNullOrEmpty(existing) && !existing.EndsWith('\n'))
+                writer.WriteLine();
+            foreach (var pattern in additions)
+                writer.WriteLine(pattern);
+        }
+        catch
+        {
+            // Local Git exclude maintenance is convenience only. It must never block
+            // loading or saving the actual Code Loom project.
         }
     }
 
