@@ -97,18 +97,24 @@ public static class CodeAssembler
         if (file.UsingStatements.Any(statement => !string.IsNullOrWhiteSpace(statement)))
             builder.AppendLine();
 
-        if (!string.IsNullOrWhiteSpace(file.Namespace))
+        var hasNamespace = !string.IsNullOrWhiteSpace(file.Namespace);
+        var typeIndent = hasNamespace ? "    " : string.Empty;
+        var memberIndent = typeIndent + "    ";
+
+        if (hasNamespace)
         {
+            // Block namespaces are intentionally used instead of C# 10 file-scoped
+            // namespaces so exported scripts remain compatible with a wider range of
+            // Unity editor/C# language-version combinations.
             builder.Append("namespace ")
-                   .Append(file.Namespace.Trim())
-                   .AppendLine(";");
-            builder.AppendLine();
+                   .AppendLine(file.Namespace.Trim());
+            builder.AppendLine("{");
         }
 
         if (!string.IsNullOrWhiteSpace(file.TypeAttributes))
         {
             foreach (var line in NormalizeLines(file.TypeAttributes))
-                builder.AppendLine(line);
+                builder.Append(typeIndent).AppendLine(line);
         }
 
         var typeModifiers = string.IsNullOrWhiteSpace(file.TypeModifiers)
@@ -118,7 +124,8 @@ public static class CodeAssembler
             ? "class"
             : file.TypeKind.Trim();
 
-        builder.Append(typeModifiers)
+        builder.Append(typeIndent)
+               .Append(typeModifiers)
                .Append(typeKind)
                .Append(' ')
                .Append(string.IsNullOrWhiteSpace(file.ClassName) ? "UnnamedClass" : file.ClassName.Trim());
@@ -127,7 +134,7 @@ public static class CodeAssembler
             builder.Append(" : ").Append(file.BaseClass.Trim());
 
         builder.AppendLine();
-        builder.AppendLine("{");
+        builder.Append(typeIndent).AppendLine("{");
 
         var plan = BuildPlan(file)
             .Where(item => !string.IsNullOrWhiteSpace(item.Subfile.Code))
@@ -142,7 +149,8 @@ public static class CodeAssembler
         {
             var group = grouped[groupIndex];
 
-            builder.Append("    // --- ")
+            builder.Append(memberIndent)
+                   .Append("// --- ")
                    .Append(group.Key)
                    .AppendLine(" ---");
             builder.AppendLine();
@@ -151,10 +159,11 @@ public static class CodeAssembler
             for (var itemIndex = 0; itemIndex < items.Count; itemIndex++)
             {
                 var item = items[itemIndex];
-                builder.Append("    // ")
+                builder.Append(memberIndent)
+                       .Append("// ")
                        .AppendLine(item.Subfile.Name);
 
-                AppendIndentedBlock(builder, item.Subfile.Code);
+                AppendIndentedBlock(builder, item.Subfile.Code, memberIndent);
 
                 if (itemIndex < items.Count - 1)
                     builder.AppendLine();
@@ -164,7 +173,10 @@ public static class CodeAssembler
                 builder.AppendLine();
         }
 
-        builder.AppendLine("}");
+        builder.Append(typeIndent).AppendLine("}");
+        if (hasNamespace)
+            builder.AppendLine("}");
+
         return builder.ToString();
     }
 
@@ -337,7 +349,7 @@ public static class CodeAssembler
         };
     }
 
-    private static void AppendIndentedBlock(StringBuilder builder, string code)
+    private static void AppendIndentedBlock(StringBuilder builder, string code, string indent)
     {
         var normalized = code
             .Replace("\r\n", "\n")
@@ -345,7 +357,7 @@ public static class CodeAssembler
             .TrimEnd('\n');
 
         foreach (var line in normalized.Split('\n'))
-            builder.Append("    ").AppendLine(line);
+            builder.Append(indent).AppendLine(line);
     }
 
     private static IEnumerable<string> NormalizeLines(string value)
