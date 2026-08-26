@@ -80,7 +80,7 @@
                                        FontWeight="SemiBold"
                                        Foreground="#E2A3A3" />
                             <TextBlock x:Name="ConflictHelpText"
-                                       Text="Resolve the conflicted files in Visual Studio, stage them, then continue the rebase here."
+                                       Text="Resolve the conflicted files in Visual Studio, stage the resolved files, then continue the rebase here."
                                        FontSize="10"
                                        Foreground="#A98D8D"
                                        TextWrapping="Wrap"
@@ -208,7 +208,7 @@
                     </Border>
                 </Expander>
 
-                <TextBlock Text="Code Loom only stages .codeloom metadata. Other local repository changes are never silently committed."
+                <TextBlock Text="Sync may stage Code Loom metadata and generated Unity scripts. Other local repository changes are never silently committed."
                            FontSize="9"
                            Foreground="#626D77"
                            TextWrapping="Wrap"
