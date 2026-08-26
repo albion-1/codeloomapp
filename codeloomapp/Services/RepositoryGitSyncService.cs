@@ -211,7 +211,9 @@ public sealed class RepositoryGitSyncService
             var errorTask = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
 
-            var output = (await outputTask).Trim();
+            // Porcelain status lines deliberately begin with spaces for some states.
+            // TrimEnd preserves those two status columns instead of corrupting the first path.
+            var output = (await outputTask).TrimEnd();
             var error = (await errorTask).Trim();
             return new GitCommandResult(
                 process.ExitCode,
