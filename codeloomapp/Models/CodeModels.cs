@@ -19,6 +19,14 @@ public sealed class CodeFile
     public string Name { get; set; } = string.Empty;
     public string ClassName { get; set; } = string.Empty;
     public string BaseClass { get; set; } = "MonoBehaviour";
+
+    // These properties let imported source keep important type-level structure
+    // without making the normal Code Loom workflow more complicated.
+    public string Namespace { get; set; } = string.Empty;
+    public string TypeKind { get; set; } = "class";
+    public string TypeModifiers { get; set; } = "public";
+    public string TypeAttributes { get; set; } = string.Empty;
+
     public ObservableCollection<string> UsingStatements { get; set; } = new();
     public ObservableCollection<CodeSubfile> Subfiles { get; set; } = new();
     public ObservableCollection<VariableDefinition> Variables { get; set; } = new();
