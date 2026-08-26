@@ -251,18 +251,20 @@ public sealed class GitSyncService
                 : string.Empty;
 
             return GitSyncResult.Fail(
-                "Code Loom found local changes outside .codeloom and left them untouched. " +
+                "Code Loom found local changes outside its metadata and managed Unity export folder and left them untouched. " +
                 "Commit, stash, or discard those changes in Visual Studio/Git before syncing.\n\n" +
                 shown + extra);
         }
 
-        // Only Code Loom metadata is staged automatically. Unrelated repository files
-        // are deliberately excluded from Code Loom's commit.
-        var add = await RunGitAsync(repositoryPath, "add", "-A", "--", ".codeloom");
+        // At this point every working-tree change is in a path Code Loom owns:
+        // .codeloom metadata or Assets/CodeLoom/Generated (plus Unity's parent .meta
+        // files). It is therefore safe to stage all changes without capturing an
+        // unrelated file by accident.
+        var add = await RunGitAsync(repositoryPath, "add", "--all");
         if (!add.Success)
-            return GitSyncResult.Fail("Could not stage Code Loom project changes:\n" + add.Output);
+            return GitSyncResult.Fail("Could not stage Code Loom-managed changes:\n" + add.Output);
 
-        var staged = await RunGitAsync(repositoryPath, "diff", "--cached", "--quiet", "--", ".codeloom");
+        var staged = await RunGitAsync(repositoryPath, "diff", "--cached", "--quiet");
         if (staged.ExitCode is not (0 or 1))
             return GitSyncResult.Fail("Could not inspect staged Code Loom changes:\n" + staged.Output);
 
@@ -406,12 +408,32 @@ public sealed class GitSyncService
 
         path = path.Trim('"');
         var normalized = path.Replace('\\', '/').TrimStart('/');
-        var isCodeLoom = normalized.StartsWith(".codeloom/", StringComparison.OrdinalIgnoreCase)
-                         || string.Equals(normalized, ".codeloom", StringComparison.OrdinalIgnoreCase);
+        var isCodeLoom = IsCodeLoomManagedPath(normalized);
         var isConflict = status is "DD" or "AU" or "UD" or "UA" or "DU" or "AA" or "UU"
                          || status.Contains('U');
 
         return new GitChangedFile(status, path, isCodeLoom, isConflict);
+    }
+
+    private static bool IsCodeLoomManagedPath(string normalizedPath)
+    {
+        return normalizedPath.StartsWith(".codeloom/", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(normalizedPath, ".codeloom", StringComparison.OrdinalIgnoreCase)
+               || normalizedPath.StartsWith(
+                   UnityExportService.GeneratedRelativePath + "/",
+                   StringComparison.OrdinalIgnoreCase)
+               || string.Equals(
+                   normalizedPath,
+                   UnityExportService.GeneratedRelativePath,
+                   StringComparison.OrdinalIgnoreCase)
+               || string.Equals(
+                   normalizedPath,
+                   UnityExportService.GeneratedRelativePath + ".meta",
+                   StringComparison.OrdinalIgnoreCase)
+               || string.Equals(
+                   normalizedPath,
+                   "Assets/CodeLoom.meta",
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static GitRemoteCommit? ParseRemoteCommit(string line)
