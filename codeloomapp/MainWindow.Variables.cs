@@ -10,6 +10,20 @@ public partial class MainWindow
     private VariableDefinition? _selectedVariable;
     private bool _isLoadingVariableEditor;
 
+    protected override void OnContentRendered(EventArgs e)
+    {
+        base.OnContentRendered(e);
+
+        FileList.SelectionChanged -= FileList_VariableSyncSelectionChanged;
+        FileList.SelectionChanged += FileList_VariableSyncSelectionChanged;
+        SyncActiveFileVariables();
+    }
+
+    private void FileList_VariableSyncSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        SyncActiveFileVariables();
+    }
+
     private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.Source, MainTabs))
