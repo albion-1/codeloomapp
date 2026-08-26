@@ -14,12 +14,6 @@ public partial class MainWindow
     private MenuItem? _assemblyReasonItem;
     private bool _smartAssemblyInitialized;
 
-    protected override void OnContentRendered(EventArgs e)
-    {
-        base.OnContentRendered(e);
-        InitializeSmartAssemblyUi();
-    }
-
     private void InitializeSmartAssemblyUi()
     {
         if (_smartAssemblyInitialized)
