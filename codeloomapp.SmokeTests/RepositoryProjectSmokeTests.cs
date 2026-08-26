@@ -139,6 +139,10 @@ internal static class RepositoryProjectSmokeTests
                     && change.PreviousRelativePath == "Assets/Scripts/Player/PlayerMovement.cs"
                     && change.RelativePath == "Assets/Scripts/Player/PlayerMover.cs"),
                 "physical C# rename should be detected when content identity is unambiguous");
+
+            // Reproduce the real Git failure mode: locally dirty Code Loom metadata must
+            // not block Pull, and unrelated local files must not make Push demand deletion.
+            RepositoryGitWorkflowSmokeTests.Run();
         }
         finally
         {
