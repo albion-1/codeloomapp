@@ -7,11 +7,34 @@ namespace codeloomapp;
 
 public partial class MainWindow
 {
+    private static readonly bool GitHubEnvironmentPrepared = PrepareGitHubEnvironment();
     private readonly GitHubCliService _githubCli = new();
     private bool _githubAccountActionBusy;
 
+    private static bool PrepareGitHubEnvironment()
+    {
+        try
+        {
+            var configDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "CodeLoom",
+                "GitHubCli");
+            Directory.CreateDirectory(configDirectory);
+            Environment.SetEnvironmentVariable(
+                "GH_CONFIG_DIR",
+                configDirectory,
+                EnvironmentVariableTarget.Process);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private async void SignInGitHub_Click(object sender, RoutedEventArgs e)
     {
+        _ = GitHubEnvironmentPrepared;
         if (_githubAccountActionBusy)
             return;
 
@@ -36,6 +59,7 @@ public partial class MainWindow
 
     private async void CreateGitHubProject_Click(object sender, RoutedEventArgs e)
     {
+        _ = GitHubEnvironmentPrepared;
         if (_githubAccountActionBusy)
             return;
 
@@ -270,6 +294,7 @@ public partial class MainWindow
 
     private async void RefreshGitHubAccount_Click(object sender, RoutedEventArgs e)
     {
+        _ = GitHubEnvironmentPrepared;
         var user = await _githubCli.GetSignedInUserAsync();
         GitHubAccountText.Text = user.Success
             ? $"GitHub: {user.Message}"
