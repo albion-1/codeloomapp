@@ -32,6 +32,7 @@ public partial class MainWindow
             if (_activeFile is null)
                 return;
 
+            EnsureNewFileHasRepositoryPath(_activeFile);
             ActiveFileText.Text = !string.IsNullOrWhiteSpace(_activeFile.RepositoryRelativePath)
                 ? _activeFile.RepositoryRelativePath
                 : _activeFile.IsLegacyUnmapped
@@ -39,7 +40,44 @@ public partial class MainWindow
                     : _activeFile.Name;
         };
 
+        Closing += (_, _) =>
+        {
+            if (!HasRepository())
+                return;
+
+            SaveEditorToActiveSubfile();
+            CommitVariableEdits();
+            _ = TrySaveRepositoryProject(showConfirmation: false, showErrors: false);
+        };
+
         _repositoryBackedProjectUiInstalled = true;
+    }
+
+    private void EnsureNewFileHasRepositoryPath(CodeFile file)
+    {
+        if (!HasRepository()
+            || file.IsLegacyUnmapped
+            || !string.IsNullOrWhiteSpace(file.RepositoryRelativePath))
+        {
+            return;
+        }
+
+        var folder = FindFolderContaining(file);
+        var directory = folder?.RepositoryRelativePath;
+        if (string.IsNullOrWhiteSpace(directory)
+            && folder is not null
+            && !string.Equals(folder.Name, "(repository root)", StringComparison.OrdinalIgnoreCase)
+            && !folder.Name.StartsWith("Legacy (unmapped)", StringComparison.OrdinalIgnoreCase))
+        {
+            directory = folder.Name;
+        }
+
+        file.RepositoryRelativePath = RepositoryProjectService.NormalizeRelativePath(
+            string.IsNullOrWhiteSpace(directory)
+                ? file.Name
+                : Path.Combine(directory, file.Name));
+        file.SourceHash = string.Empty;
+        file.IsRepositoryBacked = true;
     }
 
     private void RewireToolbarButton(WrapPanel toolbar, string content, RoutedEventHandler handler)
@@ -178,6 +216,9 @@ public partial class MainWindow
 
         try
         {
+            foreach (var file in _project.Folders.SelectMany(folder => folder.Files))
+                EnsureNewFileHasRepositoryPath(file);
+
             var result = _repositoryProject.Save(_project, _settings.GitRepositoryPath, _storage);
             if (!result.Success)
             {
