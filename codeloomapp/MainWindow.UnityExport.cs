@@ -24,9 +24,6 @@ public partial class MainWindow
         EnsureSettingsUi();
         ApplyWorkstationSettings();
 
-        // If startup ordering caused the Git/status stack to be installed a moment
-        // later, a future activation gets another harmless chance to attach the
-        // collapsed Unity details panel. The toolbar export remains available either way.
         Activated += (_, _) =>
         {
             EnsureUnityExportUi();
@@ -149,15 +146,20 @@ public partial class MainWindow
         CaptureEditorStateForAutosave();
         CommitVariableEdits();
 
+        if (HasRepository() && !TrySaveRepositoryProject(showConfirmation: false))
+            return;
+
         var previousSaveState = SaveStateText.Text;
         _unityExportBusy = true;
         SaveStateText.Text = "Exporting...";
-        StatusText.Text = "Assembling Code Loom files into normal Unity C# scripts...";
+        StatusText.Text = "Preparing normal Unity C# scripts...";
         _unityExportView?.ShowMessage("Exporting generated scripts...");
 
         try
         {
-            var result = _unityExport.Export(_project, unityProjectPath);
+            var sourceRepositoryPath = HasRepository() ? _settings.GitRepositoryPath : null;
+            var result = new RepositoryAwareUnityExportService(_unityExport)
+                .Export(_project, unityProjectPath, sourceRepositoryPath);
             _unityExportView?.LoadResult(result);
 
             if (!result.Success)
@@ -174,8 +176,6 @@ public partial class MainWindow
 
             StatusText.Text = result.Message;
 
-            // If the Unity project and Code Loom Git repository are the same folder,
-            // refresh the Git summary so newly generated scripts appear immediately.
             if (HasRepository()
                 && PathsEqual(_settings.GitRepositoryPath, result.UnityProjectPath))
             {
