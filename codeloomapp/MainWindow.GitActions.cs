@@ -99,21 +99,23 @@ public partial class MainWindow
 
             if (!preview.Available)
             {
-                ShowGitActionFailure("GitHub pull failed", preview.Message);
+                ShowGitActionFailure("GitHub pull failed", GitActionFriendlyMessage(preview.Message));
                 return;
             }
 
             if (!preview.HasIncomingChanges)
             {
                 SaveStateText.Text = preview.Ahead > 0 ? "Local commits need Push" : "Up to date";
-                StatusText.Text = preview.Message;
+                StatusText.Text = preview.Ahead > 0
+                    ? "Local commits are waiting to go to GitHub — use Push."
+                    : GitActionFriendlyMessage(preview.Message);
                 return;
             }
 
             var result = await _git.ApplyRemoteChangesAsync(_settings.GitRepositoryPath);
             if (!result.Success)
             {
-                ShowGitActionFailure("GitHub pull paused", result.Message);
+                ShowGitActionFailure("GitHub pull paused", GitActionFriendlyMessage(result.Message));
                 return;
             }
 
@@ -121,9 +123,10 @@ public partial class MainWindow
                 ReloadProjectAfterMainGitAction("Pulled GitHub changes");
 
             SaveStateText.Text = "Pulled";
+            var message = GitActionFriendlyMessage(result.Message);
             StatusText.Text = preview.ProjectDataChanged
-                ? result.Message + " Code Loom project data was reloaded."
-                : result.Message;
+                ? message + " Code Loom project data was reloaded."
+                : message;
         }
         finally
         {
@@ -147,15 +150,15 @@ public partial class MainWindow
             var result = await _git.SyncAsync(_settings.GitRepositoryPath);
             if (!result.Success)
             {
-                ShowGitActionFailure("GitHub push paused", result.Message);
+                ShowGitActionFailure("GitHub push paused", GitActionFriendlyMessage(result.Message));
                 return;
             }
 
-            // Sync can rebase incoming commits before pushing. Reload project.json in
-            // case that safe reconciliation changed the Code Loom project on disk.
+            // Push can safely rebase incoming commits before sending local work. Reload
+            // project.json in case that reconciliation changed the Code Loom project.
             ReloadProjectAfterMainGitAction("Pushed GitHub changes");
             SaveStateText.Text = "Pushed";
-            StatusText.Text = result.Message;
+            StatusText.Text = GitActionFriendlyMessage(result.Message);
         }
         finally
         {
@@ -251,5 +254,12 @@ public partial class MainWindow
             title,
             MessageBoxButton.OK,
             MessageBoxImage.Information);
+    }
+
+    private static string GitActionFriendlyMessage(string message)
+    {
+        return (message ?? string.Empty)
+            .Replace("syncing", "pushing", StringComparison.OrdinalIgnoreCase)
+            .Replace("sync", "push", StringComparison.OrdinalIgnoreCase);
     }
 }
