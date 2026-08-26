@@ -98,8 +98,6 @@ public partial class MainWindow
                 return;
             }
 
-            // Physical .cs files are now the source of truth. Always rebuild the Code
-            // Loom projection after a successful pull, regardless of project.json changes.
             var loaded = LoadRepositoryProjectFromDisk(
                 showChangeSummary: true,
                 status: "Pulled GitHub changes and refreshed physical C# files");
@@ -130,7 +128,7 @@ public partial class MainWindow
             SaveStateText.Text = "Pushing...";
             StatusText.Text = "Committing physical C# files and Code Loom metadata, then pushing to GitHub...";
 
-            var result = await _git.SyncAsync(_settings.GitRepositoryPath);
+            var result = await new RepositoryGitSyncService().SyncAsync(_settings.GitRepositoryPath);
             if (!result.Success)
             {
                 ShowGitActionFailure("GitHub push paused", GitActionFriendlyMessage(result.Message));
@@ -184,8 +182,6 @@ public partial class MainWindow
         }
         catch
         {
-            // The Git action already succeeded. Keep the current in-memory project if
-            // repository source cannot be reloaded for an unrelated local I/O reason.
         }
     }
 
