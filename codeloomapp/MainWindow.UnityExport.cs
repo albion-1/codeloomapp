@@ -147,8 +147,9 @@ public partial class MainWindow
         CaptureEditorStateForAutosave();
         CommitVariableEdits();
 
+        var previousSaveState = SaveStateText.Text;
         _unityExportBusy = true;
-        SaveStateText.Text = "Exporting to Unity...";
+        SaveStateText.Text = "Exporting...";
         StatusText.Text = "Assembling Code Loom files into normal Unity C# scripts...";
         _unityExportView?.ShowMessage("Exporting generated scripts...");
 
@@ -159,7 +160,6 @@ public partial class MainWindow
 
             if (!result.Success)
             {
-                SaveStateText.Text = "Unity export failed";
                 StatusText.Text = "Unity export failed";
                 MessageBox.Show(
                     this,
@@ -170,7 +170,6 @@ public partial class MainWindow
                 return;
             }
 
-            SaveStateText.Text = "Exported to Unity";
             StatusText.Text = result.Message;
 
             // If the Unity project and Code Loom Git repository are the same folder,
@@ -186,6 +185,7 @@ public partial class MainWindow
         }
         finally
         {
+            SaveStateText.Text = previousSaveState;
             _unityExportBusy = false;
         }
     }
