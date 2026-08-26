@@ -36,14 +36,14 @@ public partial class MainWindow
         var pullButton = new Button
         {
             Content = "Pull",
-            ToolTip = "Get incoming GitHub changes. Code Loom will not overwrite local unpushed work."
+            ToolTip = "Get incoming GitHub changes, then rescan physical repository C# files."
         };
         pullButton.Click += PullGitHub_Click;
 
         var pushButton = new Button
         {
             Content = "Push",
-            ToolTip = "Save Code Loom changes, safely incorporate GitHub updates if needed, then push.",
+            ToolTip = "Save physical C# files and Code Loom metadata, commit them, then push.",
             Background = new SolidColorBrush(Color.FromRgb(48, 56, 65)),
             Foreground = new SolidColorBrush(Color.FromRgb(241, 244, 247)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(59, 70, 81))
@@ -52,29 +52,6 @@ public partial class MainWindow
 
         toolbar.Children.Insert(insertIndex, pullButton);
         toolbar.Children.Insert(insertIndex + 1, pushButton);
-
-        // Manual Load is still useful, but make it explicit when it would replace
-        // edits that have not reached the on-disk project yet.
-        var loadButton = toolbar.Children
-            .OfType<Button>()
-            .FirstOrDefault(button => string.Equals(button.Content?.ToString(), "Load", StringComparison.Ordinal));
-        if (loadButton is not null)
-        {
-            loadButton.Click -= LoadProject_Click;
-            loadButton.Click += SafeLoadProject_Click;
-            loadButton.ToolTip = "Reload this Code Loom project from its local repository.";
-        }
-
-        // Reset Demo was useful while building the app, but one accidental click can
-        // replace a real project and then be autosaved. Do not expose it in releases.
-        var bottomRow = root.Children
-            .OfType<DockPanel>()
-            .FirstOrDefault(panel => Grid.GetRow(panel) == 3);
-        var resetButton = bottomRow?.Children
-            .OfType<Button>()
-            .FirstOrDefault(button => string.Equals(button.Content?.ToString(), "Reset Demo", StringComparison.Ordinal));
-        if (resetButton is not null)
-            resetButton.Visibility = Visibility.Collapsed;
 
         _mainGitActionsUiInstalled = true;
     }
@@ -86,7 +63,9 @@ public partial class MainWindow
 
         try
         {
-            if (!SaveProjectToDisk(false))
+            SaveEditorToActiveSubfile();
+            CommitVariableEdits();
+            if (!TrySaveRepositoryProject(showConfirmation: false))
                 return;
 
             SaveStateText.Text = "Pulling...";
@@ -119,14 +98,16 @@ public partial class MainWindow
                 return;
             }
 
-            if (preview.ProjectDataChanged)
-                ReloadProjectAfterMainGitAction("Pulled GitHub changes");
+            // Physical .cs files are now the source of truth. Always rebuild the Code
+            // Loom projection after a successful pull, regardless of project.json changes.
+            var loaded = LoadRepositoryProjectFromDisk(
+                showChangeSummary: true,
+                status: "Pulled GitHub changes and refreshed physical C# files");
 
             SaveStateText.Text = "Pulled";
-            var message = GitActionFriendlyMessage(result.Message);
-            StatusText.Text = preview.ProjectDataChanged
-                ? message + " Code Loom project data was reloaded."
-                : message;
+            StatusText.Text = loaded.Scan.Changes.Count > 0
+                ? $"{result.Message} Refreshed {loaded.Scan.Changes.Count} C# change(s)."
+                : result.Message;
         }
         finally
         {
@@ -141,11 +122,13 @@ public partial class MainWindow
 
         try
         {
-            if (!SaveProjectToDisk(false))
+            SaveEditorToActiveSubfile();
+            CommitVariableEdits();
+            if (!TrySaveRepositoryProject(showConfirmation: false))
                 return;
 
             SaveStateText.Text = "Pushing...";
-            StatusText.Text = "Saving, committing, and pushing Code Loom changes to GitHub...";
+            StatusText.Text = "Committing physical C# files and Code Loom metadata, then pushing to GitHub...";
 
             var result = await _git.SyncAsync(_settings.GitRepositoryPath);
             if (!result.Success)
@@ -154,8 +137,6 @@ public partial class MainWindow
                 return;
             }
 
-            // Push can safely rebase incoming commits before sending local work. Reload
-            // project.json in case that reconciliation changed the Code Loom project.
             ReloadProjectAfterMainGitAction("Pushed GitHub changes");
             SaveStateText.Text = "Pushed";
             StatusText.Text = GitActionFriendlyMessage(result.Message);
@@ -168,39 +149,7 @@ public partial class MainWindow
 
     private void SafeLoadProject_Click(object sender, RoutedEventArgs e)
     {
-        CaptureEditorStateForAutosave();
-
-        if (HasRepository())
-        {
-            try
-            {
-                var diskProject = _storage.LoadProject(_settings.GitRepositoryPath);
-                if (diskProject is not null)
-                {
-                    var currentJson = _storage.SerializeProject(_project);
-                    var diskJson = _storage.SerializeProject(diskProject);
-                    if (!string.Equals(currentJson, diskJson, StringComparison.Ordinal))
-                    {
-                        var answer = MessageBox.Show(
-                            this,
-                            "Reload the project from disk?\n\nThe current editor contains changes that are not in the on-disk project. Reloading will replace those changes.",
-                            "Reload project",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Warning);
-
-                        if (answer != MessageBoxResult.Yes)
-                            return;
-                    }
-                }
-            }
-            catch
-            {
-                // The existing Load handler will show the useful read/load error.
-            }
-        }
-
-        LoadProject_Click(sender, e);
-        RefreshProjectTree();
+        LoadRepositoryBacked_Click(sender, e);
     }
 
     private bool TryBeginMainGitAction(string action)
@@ -227,20 +176,16 @@ public partial class MainWindow
     {
         try
         {
-            var project = _storage.LoadProject(_settings.GitRepositoryPath);
-            if (project is null)
-                return;
-
-            _project = project;
-            RefreshEntireProjectUi();
-            RefreshProjectTree();
+            LoadRepositoryProjectFromDisk(
+                showChangeSummary: false,
+                status: historyLabel);
             CaptureImmediateHistory(historyLabel);
             _lastAutosavedFingerprint = _storage.SerializeProject(_project);
         }
         catch
         {
             // The Git action already succeeded. Keep the current in-memory project if
-            // project.json cannot be reloaded for an unrelated local I/O reason.
+            // repository source cannot be reloaded for an unrelated local I/O reason.
         }
     }
 
