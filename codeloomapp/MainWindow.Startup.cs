@@ -30,8 +30,6 @@ public partial class MainWindow
 
         if (!HasRepository())
         {
-            // Do not keep retrying a repository that has been moved, deleted, or is no
-            // longer a Git repository. The user can select it again if it comes back.
             _settings.GitRepositoryPath = string.Empty;
             _storage.SaveSettings(_settings);
             RefreshRepositoryDisplay();
@@ -41,28 +39,27 @@ public partial class MainWindow
 
         try
         {
-            var rememberedProject = _storage.LoadProject(rememberedPath);
-            if (rememberedProject is null)
-            {
-                // A valid repository may not have been initialized as a Code Loom project
-                // yet. Keep the repository selected, but never inject sample gameplay code.
-                SetBlankProjectState("Repository selected — no Code Loom project yet");
-                return;
-            }
+            var loaded = LoadRepositoryProjectFromDisk(
+                showChangeSummary: false,
+                status: "Reopened repository C# project");
 
-            // The constructor already loads remembered projects. Re-apply the loaded model
-            // here so startup has one deterministic final state even after upgrading from
-            // versions that created the built-in demo as a fallback.
-            _project = rememberedProject;
-            RefreshEntireProjectUi();
-            RefreshProjectTree();
-            SaveStateText.Text = "Loaded from disk";
-            StatusText.Text = $"Reopened {_project.Name}";
+            var physicalCount = loaded.Scan.Files.Count;
+            if (physicalCount == 0)
+                StatusText.Text = "Reopened repository · no eligible physical C# files found";
+            else if (loaded.MigratedLegacyProject)
+                StatusText.Text = $"Reopened {physicalCount} physical C# file(s) · legacy Code Loom metadata migration ready";
+            else
+                StatusText.Text = $"Reopened {physicalCount} physical C# file(s)";
         }
-        catch
+        catch (Exception exception)
         {
-            // Corrupt/unreadable project metadata should not manufacture a demo project.
-            SetBlankProjectState("Code Loom project could not be loaded");
+            SetBlankProjectState("Repository C# project could not be loaded");
+            MessageBox.Show(
+                this,
+                "Code Loom remembered the repository, but could not rebuild the project from its physical C# files.\n\n" + exception.Message,
+                "Startup project load",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 
