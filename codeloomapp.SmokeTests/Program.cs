@@ -8,7 +8,8 @@ var tests = new List<(string Name, Action Run)>
     ("Variable sync rejects ambiguous and invalid declarations", TestVariableSyncSafety),
     ("Existing C# imports and reassembles", TestImportRoundTrip),
     ("Project JSON round-trips", TestProjectStorageRoundTrip),
-    ("Unity export preserves external edits", TestUnityExportConflictProtection)
+    ("Unity export preserves external edits", TestUnityExportConflictProtection),
+    ("Repository C# scanner detects safe changes", RepositoryScannerSmokeTests.Run)
 };
 
 var failures = new List<string>();
