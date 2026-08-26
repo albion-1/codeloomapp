@@ -150,7 +150,7 @@ public sealed class ProjectStorageService
 public sealed class AppSettings
 {
     public string GitRepositoryPath { get; set; } = string.Empty;
-    public string UnityProjectPath { get; set; } = string.Empty;
+    public Dictionary<string, string> UnityProjectPaths { get; set; } = new();
 }
 
 public sealed class RecoverySnapshot
