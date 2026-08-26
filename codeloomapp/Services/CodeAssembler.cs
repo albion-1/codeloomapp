@@ -74,14 +74,6 @@ public static class CodeAssembler
         @"(?m)^\s*(?:\[[^\]\r\n]+\]\s*)*(?:(?:public|private|protected|internal|static|virtual|override|abstract|sealed|async|extern|new|partial)\s+)*(?:(?:[A-Za-z_][A-Za-z0-9_<>,?.\[\]]*\s+)+)?(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\([^;{}]*\)\s*(?:where\s+[^\r\n{=>]+\s*)?(?:\{|=>)",
         RegexOptions.Compiled);
 
-    private static readonly Regex BlockCommentRegex = new(
-        @"/\*.*?\*/",
-        RegexOptions.Compiled | RegexOptions.Singleline);
-
-    private static readonly Regex LineCommentRegex = new(
-        @"//.*?$",
-        RegexOptions.Compiled | RegexOptions.Multiline);
-
     public static string Assemble(CodeFile file)
     {
         var builder = new StringBuilder();
@@ -330,8 +322,166 @@ public static class CodeAssembler
 
     private static string StripComments(string code)
     {
-        var withoutBlocks = BlockCommentRegex.Replace(code, string.Empty);
-        return LineCommentRegex.Replace(withoutBlocks, string.Empty);
+        var builder = new StringBuilder(code.Length);
+        var state = CommentScanState.Normal;
+        var escaped = false;
+        var rawQuoteCount = 0;
+
+        for (var index = 0; index < code.Length; index++)
+        {
+            var character = code[index];
+            var next = index + 1 < code.Length ? code[index + 1] : '\0';
+
+            switch (state)
+            {
+                case CommentScanState.LineComment:
+                    if (character is '\r' or '\n')
+                    {
+                        builder.Append(character);
+                        state = CommentScanState.Normal;
+                    }
+                    else
+                    {
+                        builder.Append(' ');
+                    }
+                    break;
+
+                case CommentScanState.BlockComment:
+                    if (character == '*' && next == '/')
+                    {
+                        builder.Append("  ");
+                        index++;
+                        state = CommentScanState.Normal;
+                    }
+                    else
+                    {
+                        builder.Append(character is '\r' or '\n' ? character : ' ');
+                    }
+                    break;
+
+                case CommentScanState.String:
+                    builder.Append(character);
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (character == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (character == '"')
+                    {
+                        state = CommentScanState.Normal;
+                    }
+                    break;
+
+                case CommentScanState.Char:
+                    builder.Append(character);
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (character == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (character == '\'')
+                    {
+                        state = CommentScanState.Normal;
+                    }
+                    break;
+
+                case CommentScanState.VerbatimString:
+                    builder.Append(character);
+                    if (character == '"')
+                    {
+                        if (next == '"')
+                        {
+                            builder.Append(next);
+                            index++;
+                        }
+                        else
+                        {
+                            state = CommentScanState.Normal;
+                        }
+                    }
+                    break;
+
+                case CommentScanState.RawString:
+                    if (character == '"')
+                    {
+                        var run = CountQuoteRun(code, index);
+                        builder.Append('"', run);
+                        index += run - 1;
+                        if (run >= rawQuoteCount)
+                        {
+                            state = CommentScanState.Normal;
+                            rawQuoteCount = 0;
+                        }
+                    }
+                    else
+                    {
+                        builder.Append(character);
+                    }
+                    break;
+
+                default:
+                    if (character == '/' && next == '/')
+                    {
+                        builder.Append("  ");
+                        index++;
+                        state = CommentScanState.LineComment;
+                    }
+                    else if (character == '/' && next == '*')
+                    {
+                        builder.Append("  ");
+                        index++;
+                        state = CommentScanState.BlockComment;
+                    }
+                    else if (character == '\'')
+                    {
+                        builder.Append(character);
+                        state = CommentScanState.Char;
+                        escaped = false;
+                    }
+                    else if (character == '"')
+                    {
+                        var quoteRun = CountQuoteRun(code, index);
+                        if (quoteRun >= 3)
+                        {
+                            builder.Append('"', quoteRun);
+                            index += quoteRun - 1;
+                            rawQuoteCount = quoteRun;
+                            state = CommentScanState.RawString;
+                        }
+                        else
+                        {
+                            builder.Append(character);
+                            var verbatim = index > 0 && code[index - 1] == '@'
+                                           || index > 1 && code[index - 2] == '@' && code[index - 1] == '$';
+                            state = verbatim
+                                ? CommentScanState.VerbatimString
+                                : CommentScanState.String;
+                            escaped = false;
+                        }
+                    }
+                    else
+                    {
+                        builder.Append(character);
+                    }
+                    break;
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static int CountQuoteRun(string code, int start)
+    {
+        var count = 0;
+        while (start + count < code.Length && code[start + count] == '"')
+            count++;
+        return count;
     }
 
     private static int SectionOrder(string section)
@@ -367,6 +517,17 @@ public static class CodeAssembler
             .Replace('\r', '\n')
             .Split('\n')
             .Select(line => line.TrimEnd());
+    }
+
+    private enum CommentScanState
+    {
+        Normal,
+        LineComment,
+        BlockComment,
+        String,
+        Char,
+        VerbatimString,
+        RawString
     }
 }
 
