@@ -60,8 +60,8 @@ public partial class GitStatusView : UserControl
         {
             warnings.Add(
                 status.OtherChangeCount == 1
-                    ? "1 local change is outside Code Loom metadata. Sync will leave it untouched and wait for you to handle it first."
-                    : $"{status.OtherChangeCount} local changes are outside Code Loom metadata. Sync will leave them untouched and wait for you to handle them first.");
+                    ? "1 local change is outside Code Loom metadata and its managed Unity export folder. Sync will leave it untouched and wait for you to handle it first."
+                    : $"{status.OtherChangeCount} local changes are outside Code Loom metadata and its managed Unity export folder. Sync will leave them untouched and wait for you to handle them first.");
         }
 
         WarningText.Text = string.Join(Environment.NewLine, warnings);
