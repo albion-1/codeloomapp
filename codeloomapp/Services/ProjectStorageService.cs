@@ -50,6 +50,14 @@ public sealed class ProjectStorageService
         return JsonSerializer.Serialize(project, JsonOptions);
     }
 
+    public CodeProject? DeserializeProject(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        return JsonSerializer.Deserialize<CodeProject>(json, JsonOptions);
+    }
+
     public void SaveProject(CodeProject project, string repositoryPath)
     {
         var projectFile = GetProjectFilePath(repositoryPath);
@@ -65,7 +73,7 @@ public sealed class ProjectStorageService
             return null;
 
         var json = File.ReadAllText(projectFile);
-        return JsonSerializer.Deserialize<CodeProject>(json, JsonOptions);
+        return DeserializeProject(json);
     }
 
     public DateTime? GetProjectLastWriteTimeUtc(string repositoryPath)
