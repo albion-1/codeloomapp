@@ -14,6 +14,8 @@ public partial class MainWindow
 
     private void EnsureRepositoryScannerUi()
     {
+        EnsureRepositoryBackedProjectUi();
+
         if (_repositoryScannerUiInstalled || Content is not Grid root)
             return;
 
@@ -27,7 +29,7 @@ public partial class MainWindow
         var scanButton = new Button
         {
             Content = "Scan C#",
-            ToolTip = "Read-only scan of repository .cs files. Does not import, edit, or overwrite source files."
+            ToolTip = "Scan physical repository .cs files and refresh Code Loom when you approve the detected changes."
         };
         scanButton.Click += ScanRepositoryCSharp_Click;
 
@@ -61,27 +63,46 @@ public partial class MainWindow
             var repositoryRoot = Path.GetFullPath(_settings.GitRepositoryPath);
             if (!string.Equals(_repositoryCSharpSnapshotRoot, repositoryRoot, StringComparison.OrdinalIgnoreCase))
             {
-                _repositoryCSharpSnapshot = null;
+                _repositoryCSharpSnapshot = _repositoryProject.CreateProjectSnapshot(_project);
                 _repositoryCSharpSnapshotRoot = repositoryRoot;
             }
 
             var result = _repositoryCSharpScanner.Scan(repositoryRoot, _repositoryCSharpSnapshot);
-            _repositoryCSharpSnapshot = RepositoryCSharpScanner.CreateSnapshot(result);
+            if (result.Changes.Count == 0)
+            {
+                StatusText.Text = $"C# scan: {result.Files.Count} physical source file(s), no changes";
+                MessageBox.Show(
+                    this,
+                    "No physical C# files changed since Code Loom last loaded this repository.",
+                    "C# repository scan",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
 
-            var added = result.Changes.Count(change => change.Kind == RepositoryCSharpChangeKind.Added);
-            var changed = result.Changes.Count(change => change.Kind == RepositoryCSharpChangeKind.Changed);
-            var removed = result.Changes.Count(change => change.Kind == RepositoryCSharpChangeKind.Removed);
-
-            StatusText.Text = result.IsFirstScan
-                ? $"C# scan found {result.Files.Count} source file(s). No files were modified."
-                : $"C# scan: {added} new, {changed} changed, {removed} removed. No files were modified.";
-
-            MessageBox.Show(
+            var summary = BuildRepositoryChangeSummary(result, Array.Empty<string>());
+            var answer = MessageBox.Show(
                 this,
-                BuildRepositoryScanSummary(result),
-                "C# repository scan",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                summary + "\n\nRefresh Code Loom from these physical .cs files now?\n\nCode Loom will preserve external edits and will not overwrite a file that was changed both inside and outside the app.",
+                "C# repository changes found",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (answer != MessageBoxResult.Yes)
+            {
+                StatusText.Text = "C# changes detected · refresh postponed";
+                return;
+            }
+
+            // Save independent Code Loom edits first. The repository writer only blocks
+            // when the same physical file was edited on both sides.
+            SaveEditorToActiveSubfile();
+            CommitVariableEdits();
+            if (!TrySaveRepositoryProject(showConfirmation: false))
+                return;
+
+            LoadRepositoryProjectFromDisk(
+                showChangeSummary: true,
+                status: "Refreshed Code Loom from physical repository C# files");
         }
         catch (Exception exception)
         {
@@ -93,48 +114,5 @@ public partial class MainWindow
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
-    }
-
-    private static string BuildRepositoryScanSummary(RepositoryCSharpScanResult result)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine($"C# files found: {result.Files.Count}");
-        builder.AppendLine("Only .cs files were inspected. Source files were not changed.");
-        builder.AppendLine("Unity/build/package/generated folders are excluded.");
-        builder.AppendLine();
-
-        if (result.Changes.Count == 0)
-        {
-            builder.Append("No changes since the previous scan in this session.");
-            return builder.ToString();
-        }
-
-        if (result.IsFirstScan)
-            builder.AppendLine("First scan: existing source files are listed as discovered/new.");
-        else
-            builder.AppendLine("Changes since the previous scan:");
-
-        builder.AppendLine();
-
-        const int displayLimit = 24;
-        foreach (var change in result.Changes.Take(displayLimit))
-        {
-            var label = change.Kind switch
-            {
-                RepositoryCSharpChangeKind.Added => "NEW",
-                RepositoryCSharpChangeKind.Changed => "CHANGED",
-                RepositoryCSharpChangeKind.Removed => "REMOVED",
-                _ => "CHANGE"
-            };
-
-            builder.AppendLine($"{label}  {change.RelativePath}");
-        }
-
-        if (result.Changes.Count > displayLimit)
-            builder.AppendLine($"...and {result.Changes.Count - displayLimit} more.");
-
-        builder.AppendLine();
-        builder.Append("This scanner is detection-only for now; it does not import changes into Code Loom.");
-        return builder.ToString();
     }
 }
