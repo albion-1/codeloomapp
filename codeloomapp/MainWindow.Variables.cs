@@ -17,6 +17,7 @@ public partial class MainWindow
         FileList.SelectionChanged -= FileList_VariableSyncSelectionChanged;
         FileList.SelectionChanged += FileList_VariableSyncSelectionChanged;
         SyncActiveFileVariables();
+        InitializeUnityExportAndSettingsUi();
     }
 
     private void FileList_VariableSyncSelectionChanged(object sender, SelectionChangedEventArgs e)
