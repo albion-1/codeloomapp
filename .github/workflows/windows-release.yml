@@ -37,8 +37,14 @@ jobs:
           }
           "CODELOOM_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Restore
+      - name: Restore app
         run: dotnet restore codeloomapp/codeloomapp.csproj
+
+      - name: Restore smoke tests
+        run: dotnet restore codeloomapp.SmokeTests/codeloomapp.SmokeTests.csproj
+
+      - name: Run Code Loom smoke tests
+        run: dotnet run --project codeloomapp.SmokeTests/codeloomapp.SmokeTests.csproj -c Release --no-restore
 
       - name: Publish self-contained app
         shell: pwsh
