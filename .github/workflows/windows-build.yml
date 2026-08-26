@@ -1,5 +1,7 @@
 name: Windows Build
 
+# This lightweight workflow validates the current desktop app on the same Windows/.NET
+# toolchain used by release publishing, so compile regressions are caught before packaging.
 on:
   push:
     branches:
