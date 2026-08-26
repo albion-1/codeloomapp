@@ -7,14 +7,16 @@ public enum RepositoryCSharpChangeKind
 {
     Added,
     Changed,
-    Removed
+    Removed,
+    Renamed
 }
 
 public sealed record RepositoryCSharpFile(string RelativePath, string Hash);
 
 public sealed record RepositoryCSharpChange(
     string RelativePath,
-    RepositoryCSharpChangeKind Kind);
+    RepositoryCSharpChangeKind Kind,
+    string PreviousRelativePath = "");
 
 public sealed class RepositoryCSharpScanResult
 {
@@ -68,11 +70,14 @@ public sealed class RepositoryCSharpScanner
         }
         else
         {
+            var added = new List<RepositoryCSharpFile>();
+            var removed = new List<RepositoryCSharpFile>();
+
             foreach (var file in current)
             {
                 if (!previousSnapshot!.TryGetValue(file.RelativePath, out var previousHash))
                 {
-                    changes.Add(new RepositoryCSharpChange(file.RelativePath, RepositoryCSharpChangeKind.Added));
+                    added.Add(file);
                 }
                 else if (!string.Equals(previousHash, file.Hash, StringComparison.OrdinalIgnoreCase))
                 {
@@ -80,11 +85,44 @@ public sealed class RepositoryCSharpScanner
                 }
             }
 
-            foreach (var oldPath in previousSnapshot!.Keys)
+            foreach (var previous in previousSnapshot!)
             {
-                if (!currentMap.ContainsKey(oldPath))
-                    changes.Add(new RepositoryCSharpChange(oldPath, RepositoryCSharpChangeKind.Removed));
+                if (!currentMap.ContainsKey(previous.Key))
+                    removed.Add(new RepositoryCSharpFile(previous.Key, previous.Value));
             }
+
+            // A unique same-content remove+add pair is a conservative rename signal.
+            // Duplicate files are intentionally not guessed as moves.
+            var addedByHash = added
+                .GroupBy(file => file.Hash, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() == 1)
+                .ToDictionary(group => group.Key, group => group.Single(), StringComparer.OrdinalIgnoreCase);
+            var removedByHash = removed
+                .GroupBy(file => file.Hash, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() == 1)
+                .ToDictionary(group => group.Key, group => group.Single(), StringComparer.OrdinalIgnoreCase);
+
+            var pairedAdded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var pairedRemoved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in removedByHash)
+            {
+                if (!addedByHash.TryGetValue(pair.Key, out var destination))
+                    continue;
+
+                changes.Add(new RepositoryCSharpChange(
+                    destination.RelativePath,
+                    RepositoryCSharpChangeKind.Renamed,
+                    pair.Value.RelativePath));
+                pairedAdded.Add(destination.RelativePath);
+                pairedRemoved.Add(pair.Value.RelativePath);
+            }
+
+            changes.AddRange(added
+                .Where(file => !pairedAdded.Contains(file.RelativePath))
+                .Select(file => new RepositoryCSharpChange(file.RelativePath, RepositoryCSharpChangeKind.Added)));
+            changes.AddRange(removed
+                .Where(file => !pairedRemoved.Contains(file.RelativePath))
+                .Select(file => new RepositoryCSharpChange(file.RelativePath, RepositoryCSharpChangeKind.Removed)));
         }
 
         return new RepositoryCSharpScanResult
@@ -103,6 +141,12 @@ public sealed class RepositoryCSharpScanner
             file => file.RelativePath,
             file => file.Hash,
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static string HashFile(string path)
+    {
+        using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return Convert.ToHexString(SHA256.HashData(stream));
     }
 
     private static IEnumerable<RepositoryCSharpFile> EnumerateCSharpFiles(string repositoryRoot)
@@ -161,8 +205,7 @@ public sealed class RepositoryCSharpScanner
                 string hash;
                 try
                 {
-                    using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                    hash = Convert.ToHexString(SHA256.HashData(stream));
+                    hash = HashFile(filePath);
                 }
                 catch (IOException)
                 {
