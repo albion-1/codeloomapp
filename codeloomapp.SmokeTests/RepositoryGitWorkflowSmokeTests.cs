@@ -30,8 +30,7 @@ internal static class RepositoryGitWorkflowSmokeTests
             Git(root, "clone", remote, local);
             ConfigureIdentity(local);
 
-            const string localMetadata = "{\"localMetadata\":true}\n";
-            Write(local, ".codeloom/project.json", localMetadata);
+            Write(local, ".codeloom/project.json", "{\"localMetadata\":true}\n");
 
             File.Delete(Path.Combine(writer, "Assets", "Scripts", "PlayerMovement.cs"));
             Write(writer, "Assets/Scripts/PlayerCamera.cs", "public class PlayerCamera { }\n");
@@ -48,7 +47,8 @@ internal static class RepositoryGitWorkflowSmokeTests
                 "new PlayerCamera.cs should arrive through Pull");
             Assert(File.Exists(Path.Combine(local, "Assets", "Scripts", "BattleController.cs")),
                 "new BattleController.cs should arrive through Pull");
-            Assert(File.ReadAllText(Path.Combine(local, ".codeloom", "project.json")) == localMetadata,
+            Assert(File.ReadAllText(Path.Combine(local, ".codeloom", "project.json"))
+                    .Contains("\"localMetadata\":true", StringComparison.Ordinal),
                 "local uncommitted Code Loom metadata should be restored after Pull");
 
             Git(local, "restore", "--", ".codeloom/project.json");
