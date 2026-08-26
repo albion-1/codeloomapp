@@ -41,26 +41,10 @@ public partial class MainWindow
             CaptureEditorStateForAutosave();
             var currentFingerprint = _storage.SerializeProject(_project);
 
-            if (HasRepository())
-            {
-                var diskProject = _storage.LoadProject(_settings.GitRepositoryPath);
-                var diskFingerprint = diskProject is null
-                    ? string.Empty
-                    : _storage.SerializeProject(diskProject);
-
-                if (string.Equals(currentFingerprint, diskFingerprint, StringComparison.Ordinal))
-                {
-                    _storage.DeleteRecoverySnapshot();
-                }
-                else
-                {
-                    SaveRecoverySnapshot(cleanShutdown: false);
-                }
-            }
+            if (string.Equals(currentFingerprint, _lastAutosavedFingerprint, StringComparison.Ordinal))
+                _storage.DeleteRecoverySnapshot();
             else
-            {
-                SaveRecoverySnapshot(cleanShutdown: true);
-            }
+                SaveRecoverySnapshot(cleanShutdown: false);
         }
         catch
         {
@@ -110,17 +94,22 @@ public partial class MainWindow
 
             if (HasRepository())
             {
-                _storage.SaveProject(_project, _settings.GitRepositoryPath);
+                if (!TrySaveRepositoryProject(showConfirmation: false, showErrors: false))
+                {
+                    SaveStateText.Text = "Autosave paused";
+                    StatusText.Text = "Autosave preserved recovery data because a physical C# file needs review";
+                    return;
+                }
+
                 SaveStateText.Text = "Saved";
-                StatusText.Text = $"Autosaved at {DateTime.Now:t}";
+                StatusText.Text = $"Autosaved physical C# source at {DateTime.Now:t}";
             }
             else
             {
                 SaveStateText.Text = "Saved locally";
                 StatusText.Text = "Autosaved a local recovery copy · choose a Git repository for project storage";
+                _lastAutosavedFingerprint = fingerprint;
             }
-
-            _lastAutosavedFingerprint = fingerprint;
         }
         catch
         {
