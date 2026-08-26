@@ -1,0 +1,156 @@
+<UserControl x:Class="codeloomapp.Views.GitStatusView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+    <Expander x:Name="DetailsExpander"
+              IsExpanded="False"
+              Margin="0,7,0,0">
+        <Expander.Header>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="GIT"
+                           FontSize="9"
+                           FontWeight="SemiBold"
+                           Foreground="#7F8994"
+                           Margin="0,0,8,0" />
+                <TextBlock x:Name="SummaryText"
+                           Text="Git: checking..."
+                           FontSize="10"
+                           Foreground="#89939D" />
+            </StackPanel>
+        </Expander.Header>
+
+        <Border Background="#0D1013"
+                BorderBrush="#20262D"
+                BorderThickness="1"
+                Padding="10"
+                Margin="0,5,0,0">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Margin="0,0,10,0">
+                        <TextBlock Text="BRANCH" FontSize="9" Foreground="#68737E" />
+                        <TextBlock x:Name="BranchText" Text="—" FontSize="11" Foreground="#D9DEE4" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                        <TextBlock Text="UPSTREAM" FontSize="9" Foreground="#68737E" />
+                        <TextBlock x:Name="UpstreamText" Text="—" FontSize="11" Foreground="#C4CBD2" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Margin="0,0,10,0">
+                        <TextBlock Text="SYNC POSITION" FontSize="9" Foreground="#68737E" />
+                        <TextBlock x:Name="AheadBehindText" Text="↑ 0  ·  ↓ 0" FontSize="11" Foreground="#C4CBD2" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="WORKING TREE" FontSize="9" Foreground="#68737E" />
+                        <TextBlock x:Name="WorkingTreeText" Text="Checking..." FontSize="11" Foreground="#C4CBD2" Margin="0,2,0,0" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock x:Name="WarningText"
+                           Visibility="Collapsed"
+                           Foreground="#D4B279"
+                           FontSize="10"
+                           TextWrapping="Wrap"
+                           Margin="0,9,0,0" />
+
+                <Border x:Name="ConflictPanel"
+                        Visibility="Collapsed"
+                        Background="#171313"
+                        BorderBrush="#4A3030"
+                        BorderThickness="1"
+                        Padding="9"
+                        Margin="0,9,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Name="ConflictTitleText"
+                                       Text="Git conflict"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="#E2A3A3" />
+                            <TextBlock x:Name="ConflictHelpText"
+                                       Text="Resolve the conflicted files in Visual Studio, stage them, then continue the rebase here."
+                                       FontSize="10"
+                                       Foreground="#A98D8D"
+                                       TextWrapping="Wrap"
+                                       Margin="0,3,12,0" />
+                        </StackPanel>
+                        <Button x:Name="ContinueRebaseButton"
+                                Grid.Column="1"
+                                Content="Continue Rebase"
+                                Click="ContinueRebase_Click"
+                                Padding="7,3"
+                                Margin="0"
+                                VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
+                <TextBlock Text="Code Loom only stages .codeloom metadata. Other local repository changes are never silently committed."
+                           FontSize="9"
+                           Foreground="#626D77"
+                           TextWrapping="Wrap"
+                           Margin="0,9,0,0" />
+
+                <Expander Header="Changed files"
+                          IsExpanded="False"
+                          Margin="0,8,0,0">
+                    <Border Background="#0F1215"
+                            BorderBrush="#1D2329"
+                            BorderThickness="1"
+                            Padding="8"
+                            Margin="0,4,0,0">
+                        <ScrollViewer MaxHeight="110" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="ChangesItems">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="34" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Status}"
+                                                       FontFamily="Cascadia Mono, Consolas"
+                                                       FontSize="10"
+                                                       Foreground="#909AA4" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Path}"
+                                                       FontFamily="Cascadia Mono, Consolas"
+                                                       FontSize="10"
+                                                       Foreground="#BEC5CC"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </Expander>
+
+                <DockPanel Margin="0,9,0,0">
+                    <TextBlock x:Name="RemoteText"
+                               Text="origin: —"
+                               Foreground="#626D77"
+                               FontSize="9"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <Button DockPanel.Dock="Right"
+                            Content="Refresh Git Status"
+                            Click="Refresh_Click"
+                            Padding="7,3"
+                            Margin="8,0,0,0" />
+                </DockPanel>
+            </StackPanel>
+        </Border>
+    </Expander>
+</UserControl>
