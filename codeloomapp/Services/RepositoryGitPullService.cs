@@ -34,7 +34,7 @@ public sealed class RepositoryGitPullService
         if (!initial.Success)
             return GitSyncResult.Fail("Could not inspect the local repository before Pull:\n" + initial.Output);
 
-        var hadLocalChanges = !string.IsNullOrWhiteSpace(initial.Output);
+        var hadLocalChanges = !string.IsNullOrWhiteSpace(initial.StdOut);
         var stashCreated = false;
 
         if (hadLocalChanges)
@@ -53,7 +53,7 @@ public sealed class RepositoryGitPullService
                     "Nothing was deleted or overwritten.\n\n" + stash.Output);
             }
 
-            stashCreated = !stash.Output.Contains(
+            stashCreated = !stash.StdOut.Contains(
                 "No local changes to save",
                 StringComparison.OrdinalIgnoreCase);
         }
@@ -63,7 +63,7 @@ public sealed class RepositoryGitPullService
             return await FailAndRestoreAsync(repositoryPath, stashCreated, "Could not refresh GitHub before Pull:\n" + fetch.Output);
 
         var branch = await RunGitAsync(repositoryPath, "symbolic-ref", "--quiet", "--short", "HEAD");
-        if (!branch.Success || string.IsNullOrWhiteSpace(branch.Output))
+        if (!branch.Success || string.IsNullOrWhiteSpace(branch.StdOut))
             return await FailAndRestoreAsync(repositoryPath, stashCreated, "Check out a normal branch before Pull.");
 
         var upstream = await RunGitAsync(
@@ -72,7 +72,7 @@ public sealed class RepositoryGitPullService
             "--abbrev-ref",
             "--symbolic-full-name",
             "@{upstream}");
-        if (!upstream.Success || string.IsNullOrWhiteSpace(upstream.Output))
+        if (!upstream.Success || string.IsNullOrWhiteSpace(upstream.StdOut))
         {
             return await FailAndRestoreAsync(
                 repositoryPath,
@@ -80,16 +80,17 @@ public sealed class RepositoryGitPullService
                 "This branch has no upstream GitHub branch to pull from.");
         }
 
+        var upstreamName = upstream.StdOut.Trim();
         var counts = await RunGitAsync(
             repositoryPath,
             "rev-list",
             "--left-right",
             "--count",
-            $"HEAD...{upstream.Output.Trim()}");
+            $"HEAD...{upstreamName}");
         if (!counts.Success)
             return await FailAndRestoreAsync(repositoryPath, stashCreated, "Could not compare the local branch with GitHub:\n" + counts.Output);
 
-        ParseAheadBehind(counts.Output, out var ahead, out var behind);
+        ParseAheadBehind(counts.StdOut, out var ahead, out var behind);
         if (behind <= 0)
         {
             var restore = await RestoreSafetyStashAsync(repositoryPath, stashCreated);
@@ -104,7 +105,7 @@ public sealed class RepositoryGitPullService
 
         if (ahead > 0)
         {
-            var rebase = await RunGitAsync(repositoryPath, "rebase", upstream.Output.Trim());
+            var rebase = await RunGitAsync(repositoryPath, "rebase", upstreamName);
             if (!rebase.Success)
             {
                 await RunGitAsync(repositoryPath, "rebase", "--abort");
@@ -121,7 +122,7 @@ public sealed class RepositoryGitPullService
                 repositoryPath,
                 "merge",
                 "--ff-only",
-                upstream.Output.Trim());
+                upstreamName);
             if (!fastForward.Success)
             {
                 return await FailAndRestoreAsync(
@@ -150,7 +151,10 @@ public sealed class RepositoryGitPullService
         if (!unresolved.Success)
             return GitSyncResult.Fail("Could not inspect unresolved Git files:\n" + unresolved.Output);
 
-        var conflicts = SplitPaths(unresolved.Output);
+        // Only stdout contains path names. Git can emit harmless line-ending warnings
+        // on stderr; treating those warnings as filenames caused 0.1.7's repair path to
+        // falsely report a second conflict.
+        var conflicts = SplitPaths(unresolved.StdOut);
         if (conflicts.Count == 0)
             return GitSyncResult.Ok("No interrupted Code Loom metadata conflict found.");
 
@@ -185,7 +189,7 @@ public sealed class RepositoryGitPullService
         // change has already been applied to the working tree. Drop only Code Loom's
         // own top safety stash so it cannot cause another false conflict later.
         var topStash = await RunGitAsync(repositoryPath, "stash", "list", "-n", "1", "--format=%gd%x09%s");
-        if (topStash.Success && topStash.Output.Contains(SafetyStashMessage, StringComparison.OrdinalIgnoreCase))
+        if (topStash.Success && topStash.StdOut.Contains(SafetyStashMessage, StringComparison.OrdinalIgnoreCase))
             _ = await RunGitAsync(repositoryPath, "stash", "drop", "stash@{0}");
 
         return GitSyncResult.Ok("Recovered the interrupted Code Loom metadata restore.");
@@ -203,7 +207,7 @@ public sealed class RepositoryGitPullService
         if (!metadataStatus.Success)
             return GitSyncResult.Fail("Could not inspect Code Loom project metadata before Pull:\n" + metadataStatus.Output);
 
-        if (string.IsNullOrWhiteSpace(metadataStatus.Output))
+        if (string.IsNullOrWhiteSpace(metadataStatus.StdOut))
             return GitSyncResult.Ok("Code Loom metadata is already clean.");
 
         var tracked = await RunGitAsync(repositoryPath, "ls-files", "--error-unmatch", "--", ProjectMetadataPath);
@@ -321,24 +325,24 @@ public sealed class RepositoryGitPullService
             var errorTask = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
 
-            var output = (await outputTask).TrimEnd();
-            var error = (await errorTask).Trim();
-            return new GitCommandResult(
-                process.ExitCode,
-                string.Join(
-                    Environment.NewLine,
-                    new[] { output, error }.Where(value => !string.IsNullOrWhiteSpace(value))));
+            var stdout = (await outputTask).TrimEnd();
+            var stderr = (await errorTask).Trim();
+            return new GitCommandResult(process.ExitCode, stdout, stderr);
         }
         catch (Exception exception)
         {
             return new GitCommandResult(
                 -1,
+                string.Empty,
                 "Could not run Git using " + GitExecutableLocator.DescribeResolvedPath() + ".\n" + exception.Message);
         }
     }
 
-    private sealed record GitCommandResult(int ExitCode, string Output)
+    private sealed record GitCommandResult(int ExitCode, string StdOut, string StdErr)
     {
         public bool Success => ExitCode == 0;
+        public string Output => string.Join(
+            Environment.NewLine,
+            new[] { StdOut, StdErr }.Where(value => !string.IsNullOrWhiteSpace(value)));
     }
 }
