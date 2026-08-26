@@ -30,13 +30,22 @@ public sealed class GitHubCliService
                 : setupExisting;
         }
 
-        // --web opens the user's normal browser. GitHub CLI stores the credential
-        // using the platform's normal secure credential storage.
-        var login = await RunAsync(
+        // Browser authentication needs a visible interactive console. Running this
+        // through the hidden redirected helper made the button look dead because gh
+        // was waiting for an interaction the user could not see.
+        var login = await RunInteractiveAsync(
             null,
             "auth login --hostname github.com --git-protocol https --web --skip-ssh-key");
         if (!login.Success)
-            return GitHubCliResult.Fail("GitHub sign-in failed:\n" + login.Output);
+            return GitHubCliResult.Fail("GitHub sign-in did not complete:\n" + login.Output);
+
+        var verify = await RunAsync(null, "auth status");
+        if (!verify.Success)
+        {
+            return GitHubCliResult.Fail(
+                "The GitHub sign-in window closed, but GitHub CLI still reports that no account is signed in. " +
+                "Try Sign in to GitHub again and finish the browser confirmation.");
+        }
 
         var setup = await EnsureGitCredentialIntegrationAsync();
         if (!setup.Success)
@@ -161,6 +170,36 @@ public sealed class GitHubCliService
 
     private static Task<CommandResult> RunAsync(string? workingDirectory, string arguments) =>
         RunProcessAsync(ResolveGitHubCliExecutable(), arguments, workingDirectory);
+
+    private static async Task<CommandResult> RunInteractiveAsync(
+        string? workingDirectory,
+        string arguments)
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = ResolveGitHubCliExecutable(),
+                Arguments = arguments,
+                WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Normal
+            };
+
+            using var process = Process.Start(startInfo);
+            if (process is null)
+                return new CommandResult(false, "Windows could not open the GitHub sign-in helper.");
+
+            await process.WaitForExitAsync();
+            return process.ExitCode == 0
+                ? new CommandResult(true, "GitHub sign-in helper completed.")
+                : new CommandResult(false, "The GitHub sign-in helper was cancelled or exited with an error.");
+        }
+        catch (Exception exception)
+        {
+            return new CommandResult(false, exception.Message);
+        }
+    }
 
     private static string ResolveGitHubCliExecutable()
     {
