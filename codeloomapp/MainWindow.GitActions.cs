@@ -63,38 +63,27 @@ public partial class MainWindow
 
         try
         {
-            // Persist any editor change first. RepositoryGitPullService then protects
-            // every uncommitted working-tree change with a temporary Git stash, so
-            // Code Loom's own metadata can never make Pull deadlock itself.
             SaveEditorToActiveSubfile();
             CommitVariableEdits();
+
+            // Keep a full local recovery copy and a semantic metadata snapshot before
+            // touching Git. RepositoryGitPullService deliberately resets generated
+            // .codeloom/project.json to HEAD before stashing, so that generated metadata
+            // can never conflict with itself during Pull. Real C# edits are still saved
+            // to disk first and protected by the Git safety stash.
+            var localMetadataSnapshot = _storage.DeserializeProject(_storage.SerializeProject(_project));
+            SaveRecoverySnapshot(cleanShutdown: false);
             if (!TrySaveRepositoryProject(showConfirmation: false))
                 return;
 
             SaveStateText.Text = "Pulling...";
-            StatusText.Text = "Checking GitHub for incoming changes...";
+            StatusText.Text = "Checking GitHub and refreshing physical C# files...";
 
-            var preview = await _git.GetRemoteChangePreviewAsync(
-                _settings.GitRepositoryPath,
-                fetchRemote: true);
-            _lastRemoteFetchUtc = DateTime.UtcNow;
-
-            if (!preview.Available)
-            {
-                ShowGitActionFailure("GitHub pull failed", GitActionFriendlyMessage(preview.Message));
-                return;
-            }
-
-            if (!preview.HasIncomingChanges)
-            {
-                SaveStateText.Text = preview.Ahead > 0 ? "Local commits need Push" : "Up to date";
-                StatusText.Text = preview.Ahead > 0
-                    ? "Local commits are waiting to go to GitHub — use Push."
-                    : GitActionFriendlyMessage(preview.Message);
-                return;
-            }
-
+            // PullAsync now owns fetch/ahead-behind checking as well as recovery of the
+            // specific project.json conflict left by 0.1.7. Calling it directly also
+            // means an already-up-to-date branch can still repair that interrupted state.
             var result = await new RepositoryGitPullService().PullAsync(_settings.GitRepositoryPath);
+            _lastRemoteFetchUtc = DateTime.UtcNow;
             if (!result.Success)
             {
                 ShowGitActionFailure("GitHub pull paused", GitActionFriendlyMessage(result.Message));
@@ -104,6 +93,16 @@ public partial class MainWindow
             var loaded = LoadRepositoryProjectFromDisk(
                 showChangeSummary: true,
                 status: "Pulled GitHub changes and refreshed physical C# files");
+
+            // project.json is metadata only. Preserve local Code Loom descriptions and
+            // manual section choices by merging those fields onto the newly imported
+            // physical files instead of restoring the old JSON bytes over GitHub's copy.
+            if (localMetadataSnapshot is not null)
+            {
+                MergeLocalCodeLoomMetadata(localMetadataSnapshot, _project);
+                _storage.SaveRepositoryMetadata(_project, _settings.GitRepositoryPath);
+                _lastAutosavedFingerprint = _storage.SerializeProject(_project);
+            }
 
             SaveStateText.Text = "Pulled";
             StatusText.Text = loaded.Scan.Changes.Count > 0
