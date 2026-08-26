@@ -19,6 +19,7 @@ public partial class MainWindow
         SyncActiveFileVariables();
         InitializeSmartAssemblyUi();
         InitializeUnityExportAndSettingsUi();
+        InitializeVisualPolish();
     }
 
     private void FileList_VariableSyncSelectionChanged(object sender, SelectionChangedEventArgs e)
