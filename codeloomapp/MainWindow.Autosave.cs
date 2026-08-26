@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -48,25 +49,20 @@ public partial class MainWindow
 
                 if (string.Equals(currentFingerprint, diskFingerprint, StringComparison.Ordinal))
                 {
-                    // MainWindow.OnClosing already saved the project successfully.
-                    // No crash-recovery file is needed after a clean exit.
                     _storage.DeleteRecoverySnapshot();
                 }
                 else
                 {
-                    // The normal close save failed or did not complete. Keep a recovery copy.
                     SaveRecoverySnapshot(cleanShutdown: false);
                 }
             }
             else
             {
-                // A project can still survive a normal restart before the user chooses a Git repo.
                 SaveRecoverySnapshot(cleanShutdown: true);
             }
         }
         catch
         {
-            // Closing must never be blocked by recovery housekeeping.
         }
 
         base.OnClosed(e);
@@ -102,9 +98,6 @@ public partial class MainWindow
         if (string.Equals(fingerprint, _lastAutosavedFingerprint, StringComparison.Ordinal))
             return;
 
-        // Project history is local and independent from Git. Capture the state even
-        // if the later repository write fails, so a failed autosave still leaves a
-        // recoverable checkpoint on this PC.
         CaptureProjectHistory(fingerprint, DescribeHistoryChange());
 
         _autosaveBusy = true;
