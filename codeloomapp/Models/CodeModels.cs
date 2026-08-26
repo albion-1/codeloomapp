@@ -4,13 +4,15 @@ namespace codeloomapp.Models;
 
 public sealed class CodeProject
 {
-    public string Name { get; set; } = "Wizard Game";
+    public int SchemaVersion { get; set; } = 2;
+    public string Name { get; set; } = "Untitled Project";
     public ObservableCollection<CodeFolder> Folders { get; set; } = new();
 }
 
 public sealed class CodeFolder
 {
     public string Name { get; set; } = string.Empty;
+    public string RepositoryRelativePath { get; set; } = string.Empty;
     public ObservableCollection<CodeFile> Files { get; set; } = new();
 }
 
@@ -19,6 +21,13 @@ public sealed class CodeFile
     public string Name { get; set; } = string.Empty;
     public string ClassName { get; set; } = string.Empty;
     public string BaseClass { get; set; } = "MonoBehaviour";
+
+    // Physical repository identity. Ordinary .cs files are the canonical source of
+    // code; Code Loom keeps this path/hash so it can safely project them into subfiles.
+    public string RepositoryRelativePath { get; set; } = string.Empty;
+    public string SourceHash { get; set; } = string.Empty;
+    public bool IsRepositoryBacked { get; set; }
+    public bool IsLegacyUnmapped { get; set; }
 
     // These properties let imported source keep important type-level structure
     // without making the normal Code Loom workflow more complicated.
