@@ -151,6 +151,13 @@ public sealed class AppSettings
 {
     public string GitRepositoryPath { get; set; } = string.Empty;
     public Dictionary<string, string> UnityProjectPaths { get; set; } = new();
+
+    // Lightweight workstation preferences. These are intentionally global rather
+    // than project data so opening another project keeps the editor comfortable.
+    public double EditorFontSize { get; set; } = 13;
+    public bool EditorWordWrap { get; set; }
+    public bool ShowEditorLineNumbers { get; set; } = true;
+    public int AutosaveSeconds { get; set; } = 3;
 }
 
 public sealed class RecoverySnapshot
