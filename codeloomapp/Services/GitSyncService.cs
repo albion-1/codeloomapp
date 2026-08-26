@@ -27,7 +27,13 @@ public sealed class GitSyncService
                 warning = "Remote refresh failed: " + fetch.Output;
         }
 
-        var porcelain = await RunGitAsync(repositoryPath, "status", "--porcelain=v1");
+        // Expand untracked directories into individual files so Code Loom can
+        // distinguish its generated Unity scripts from unrelated repository work.
+        var porcelain = await RunGitAsync(
+            repositoryPath,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all");
         if (!porcelain.Success)
             return GitRepositoryStatus.Unavailable("Could not inspect Git status: " + porcelain.Output);
 
