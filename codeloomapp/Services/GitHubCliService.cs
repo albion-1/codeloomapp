@@ -62,6 +62,10 @@ public sealed class GitHubCliService
                 return GitHubCliResult.Fail("Could not initialize the local Git repository:\n" + init.Output);
         }
 
+        var identity = await EnsureLocalGitIdentityAsync(localFolder, signIn.Message);
+        if (!identity.Success)
+            return identity;
+
         var add = await RunGitAsync(localFolder, "add --all");
         if (!add.Success)
             return GitHubCliResult.Fail("Could not stage project files:\n" + add.Output);
@@ -89,6 +93,36 @@ public sealed class GitHubCliService
             return GitHubCliResult.Fail("GitHub repository creation failed:\n" + create.Output);
 
         return GitHubCliResult.Ok(create.Output);
+    }
+
+    private static async Task<GitHubCliResult> EnsureLocalGitIdentityAsync(
+        string localFolder,
+        string githubLogin)
+    {
+        var currentName = await RunGitAsync(localFolder, "config user.name");
+        if (!currentName.Success || string.IsNullOrWhiteSpace(currentName.Output))
+        {
+            var setName = await RunGitAsync(localFolder, $"config user.name \"{githubLogin}\"");
+            if (!setName.Success)
+            {
+                return GitHubCliResult.Fail(
+                    "Code Loom could not configure a local Git author name for the new repository:\n" + setName.Output);
+            }
+        }
+
+        var currentEmail = await RunGitAsync(localFolder, "config user.email");
+        if (!currentEmail.Success || string.IsNullOrWhiteSpace(currentEmail.Output))
+        {
+            var email = githubLogin + "@users.noreply.github.com";
+            var setEmail = await RunGitAsync(localFolder, $"config user.email \"{email}\"");
+            if (!setEmail.Success)
+            {
+                return GitHubCliResult.Fail(
+                    "Code Loom could not configure a local Git author email for the new repository:\n" + setEmail.Output);
+            }
+        }
+
+        return GitHubCliResult.Ok("Local Git identity is ready.");
     }
 
     private static Task<CommandResult> RunGitAsync(string workingDirectory, string arguments) =>
