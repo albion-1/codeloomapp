@@ -21,6 +21,7 @@ public partial class MainWindow
     {
         base.OnSourceInitialized(e);
 
+        FinalizeStartupProjectStateOnce();
         TryRestoreRecoverySnapshot();
         InstallAutosaveUiHooks();
         InitializeProjectHistory();
