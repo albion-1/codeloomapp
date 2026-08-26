@@ -10,7 +10,9 @@ public sealed class GitHubCliService
         var result = await RunAsync(null, "--version");
         return result.Success
             ? GitHubCliResult.Ok(result.Output)
-            : GitHubCliResult.Fail("GitHub CLI (gh) is not installed or not available in PATH. Install it from https://cli.github.com/ and restart Code Loom.");
+            : GitHubCliResult.Fail(
+                "Code Loom could not find GitHub CLI. This release normally includes its own copy of gh.exe. " +
+                "Reinstall the latest Code Loom build, or install GitHub CLI separately and restart Code Loom.");
     }
 
     public async Task<GitHubCliResult> SignInAsync()
@@ -21,18 +23,34 @@ public sealed class GitHubCliService
 
         var status = await RunAsync(null, "auth status");
         if (status.Success)
-            return GitHubCliResult.Ok("Already signed in to GitHub.");
+        {
+            var setupExisting = await EnsureGitCredentialIntegrationAsync();
+            return setupExisting.Success
+                ? GitHubCliResult.Ok("Already signed in to GitHub.")
+                : setupExisting;
+        }
 
-        // --web opens the user's normal browser. GitHub CLI stores the credential securely.
-        var login = await RunAsync(null, "auth login --hostname github.com --git-protocol https --web");
+        // --web opens the user's normal browser. GitHub CLI stores the credential
+        // using the platform's normal secure credential storage.
+        var login = await RunAsync(
+            null,
+            "auth login --hostname github.com --git-protocol https --web --skip-ssh-key");
         if (!login.Success)
             return GitHubCliResult.Fail("GitHub sign-in failed:\n" + login.Output);
+
+        var setup = await EnsureGitCredentialIntegrationAsync();
+        if (!setup.Success)
+            return setup;
 
         return GitHubCliResult.Ok("GitHub sign-in completed.");
     }
 
     public async Task<GitHubCliResult> GetSignedInUserAsync()
     {
+        var available = await CheckAvailabilityAsync();
+        if (!available.Success)
+            return available;
+
         var status = await RunAsync(null, "auth status");
         if (!status.Success)
             return GitHubCliResult.Fail("Not signed in to GitHub.");
@@ -95,6 +113,19 @@ public sealed class GitHubCliService
         return GitHubCliResult.Ok(create.Output);
     }
 
+    private static async Task<GitHubCliResult> EnsureGitCredentialIntegrationAsync()
+    {
+        // Configure normal HTTPS Git commands to ask the same authenticated GitHub CLI
+        // for credentials. This keeps Code Loom's Pull/Push buttons working after the
+        // browser sign-in without storing a token in Code Loom itself.
+        var setup = await RunAsync(null, "auth setup-git");
+        return setup.Success
+            ? GitHubCliResult.Ok("Git credentials are connected to GitHub CLI.")
+            : GitHubCliResult.Fail(
+                "GitHub sign-in succeeded, but Code Loom could not connect Git to that sign-in:\n" +
+                setup.Output);
+    }
+
     private static async Task<GitHubCliResult> EnsureLocalGitIdentityAsync(
         string localFolder,
         string githubLogin)
@@ -129,9 +160,26 @@ public sealed class GitHubCliService
         RunProcessAsync("git", arguments, workingDirectory);
 
     private static Task<CommandResult> RunAsync(string? workingDirectory, string arguments) =>
-        RunProcessAsync("gh", arguments, workingDirectory);
+        RunProcessAsync(ResolveGitHubCliExecutable(), arguments, workingDirectory);
 
-    private static async Task<CommandResult> RunProcessAsync(string fileName, string arguments, string? workingDirectory)
+    private static string ResolveGitHubCliExecutable()
+    {
+        // Release builds carry the official portable GitHub CLI next to Code Loom, so
+        // users do not have to install gh or modify PATH. Developer builds still fall
+        // back to a normal system installation when the bundled executable is absent.
+        var bundled = Path.Combine(
+            AppContext.BaseDirectory,
+            "tools",
+            "gh",
+            "gh.exe");
+
+        return File.Exists(bundled) ? bundled : "gh";
+    }
+
+    private static async Task<CommandResult> RunProcessAsync(
+        string fileName,
+        string arguments,
+        string? workingDirectory)
     {
         try
         {
