@@ -26,11 +26,40 @@ public sealed class CodeFile
     public override string ToString() => Name;
 }
 
+public static class AssemblySections
+{
+    public const string Auto = "Auto";
+    public const string Fields = "Fields & Settings";
+    public const string Properties = "Properties";
+    public const string Constructors = "Constructors";
+    public const string UnityLifecycle = "Unity Lifecycle";
+    public const string Methods = "Methods";
+    public const string NestedTypes = "Nested Types";
+    public const string Other = "Other";
+
+    public static IReadOnlyList<string> All { get; } = new[]
+    {
+        Auto,
+        Fields,
+        Properties,
+        Constructors,
+        UnityLifecycle,
+        Methods,
+        NestedTypes,
+        Other
+    };
+}
+
 public sealed class CodeSubfile
 {
     public string Name { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
+
+    // Auto lets Code Loom inspect the code fragment and choose where it belongs
+    // in the assembled class. A manual section overrides that inference.
+    public string AssemblySection { get; set; } = AssemblySections.Auto;
+
     public string Receives { get; set; } = "Nothing";
     public string Returns { get; set; } = "Nothing";
     public string UsedBy { get; set; } = "Not specified";
