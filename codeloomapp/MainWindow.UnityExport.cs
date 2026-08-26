@@ -26,7 +26,11 @@ public partial class MainWindow
         // If startup ordering caused the Git/status stack to be installed a moment
         // later, a future activation gets another harmless chance to attach the
         // collapsed Unity details panel. The toolbar export remains available either way.
-        Activated += (_, _) => EnsureUnityExportUi();
+        Activated += (_, _) =>
+        {
+            EnsureUnityExportUi();
+            RefreshUnityExportUi();
+        };
     }
 
     private void EnsureUnityExportUi()
@@ -95,13 +99,14 @@ public partial class MainWindow
 
     private void UnityExportView_OpenFolderRequested(object? sender, EventArgs e)
     {
-        if (!_unityExport.IsUnityProject(_settings.UnityProjectPath))
+        var unityProjectPath = GetConfiguredUnityProjectPath();
+        if (!_unityExport.IsUnityProject(unityProjectPath))
         {
             StatusText.Text = "Choose a Unity project before opening the generated scripts folder";
             return;
         }
 
-        var generatedRoot = _unityExport.GetGeneratedRoot(_settings.UnityProjectPath);
+        var generatedRoot = _unityExport.GetGeneratedRoot(unityProjectPath);
         Directory.CreateDirectory(generatedRoot);
 
         try
@@ -130,10 +135,13 @@ public partial class MainWindow
 
         EnsureUnityExportUi();
 
-        if (!_unityExport.IsUnityProject(_settings.UnityProjectPath)
-            && !ChooseUnityProject())
+        var unityProjectPath = GetConfiguredUnityProjectPath();
+        if (!_unityExport.IsUnityProject(unityProjectPath))
         {
-            return;
+            if (!ChooseUnityProject())
+                return;
+
+            unityProjectPath = GetConfiguredUnityProjectPath();
         }
 
         CaptureEditorStateForAutosave();
@@ -146,7 +154,7 @@ public partial class MainWindow
 
         try
         {
-            var result = _unityExport.Export(_project, _settings.UnityProjectPath);
+            var result = _unityExport.Export(_project, unityProjectPath);
             _unityExportView?.LoadResult(result);
 
             if (!result.Success)
@@ -204,18 +212,38 @@ public partial class MainWindow
             return false;
         }
 
-        _settings.UnityProjectPath = normalized;
+        _settings.UnityProjectPaths ??= new Dictionary<string, string>();
+        _settings.UnityProjectPaths[GetUnityTargetContextKey()] = normalized;
         _storage.SaveSettings(_settings);
         RefreshUnityExportUi();
         StatusText.Text = $"Unity target: {Path.GetFileName(normalized)}";
         return true;
     }
 
+    private string GetConfiguredUnityProjectPath()
+    {
+        var targets = _settings.UnityProjectPaths;
+        if (targets is null)
+            return string.Empty;
+
+        return targets.TryGetValue(GetUnityTargetContextKey(), out var path)
+            ? path
+            : string.Empty;
+    }
+
+    private string GetUnityTargetContextKey()
+    {
+        return HasRepository()
+            ? "repo|" + Path.GetFullPath(_settings.GitRepositoryPath).ToUpperInvariant()
+            : "local|" + _project.Name;
+    }
+
     private void RefreshUnityExportUi()
     {
+        var unityProjectPath = GetConfiguredUnityProjectPath();
         _unityExportView?.LoadTarget(
-            _settings.UnityProjectPath,
-            _unityExport.IsUnityProject(_settings.UnityProjectPath));
+            unityProjectPath,
+            _unityExport.IsUnityProject(unityProjectPath));
     }
 
     private void ShowUnityExportNotes(UnityExportResult result)
