@@ -8,10 +8,8 @@ public partial class MainWindow
 {
     private bool _startupStateFinalized;
 
-    protected override void OnSourceInitialized(EventArgs e)
+    private void FinalizeStartupProjectStateOnce()
     {
-        base.OnSourceInitialized(e);
-
         if (_startupStateFinalized)
             return;
 
