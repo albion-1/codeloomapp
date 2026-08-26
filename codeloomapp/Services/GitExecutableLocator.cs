@@ -23,6 +23,30 @@ public static class GitExecutableLocator
         return "git";
     }
 
+    public static void EnsureOnProcessPath()
+    {
+        var resolved = Resolve();
+        if (!Path.IsPathRooted(resolved) || !File.Exists(resolved))
+            return;
+
+        var directory = Path.GetDirectoryName(resolved);
+        if (string.IsNullOrWhiteSpace(directory))
+            return;
+
+        var current = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        var entries = current.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        if (entries.Any(entry =>
+                string.Equals(entry.Trim().Trim('"'), directory, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        Environment.SetEnvironmentVariable(
+            "PATH",
+            directory + Path.PathSeparator + current,
+            EnvironmentVariableTarget.Process);
+    }
+
     public static string DescribeResolvedPath()
     {
         var resolved = Resolve();
