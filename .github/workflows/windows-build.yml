@@ -1,7 +1,7 @@
 name: Windows Build
 
-# This lightweight workflow validates the current desktop app on the same Windows/.NET
-# toolchain used by release publishing, so compile regressions are caught before packaging.
+# Validate both compilation and the non-UI services that protect project data,
+# assembly, imports, variables, and Unity exports before release packaging.
 on:
   push:
     branches:
@@ -22,8 +22,14 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Restore
+      - name: Restore app
         run: dotnet restore codeloomapp/codeloomapp.csproj
+
+      - name: Restore smoke tests
+        run: dotnet restore codeloomapp.SmokeTests/codeloomapp.SmokeTests.csproj
 
       - name: Build
         run: dotnet build codeloomapp/codeloomapp.csproj -c Release --no-restore
+
+      - name: Run Code Loom smoke tests
+        run: dotnet run --project codeloomapp.SmokeTests/codeloomapp.SmokeTests.csproj -c Release --no-restore
